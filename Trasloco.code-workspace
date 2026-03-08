@@ -1,0 +1,13 @@
+{
+  "folders": [
+    {
+      "path": "."
+    }
+  ],
+  "settings": {
+    "liveServer.settings.root": "/",
+    "liveServer.settings.multiRootWorkspaceName": "Trasloco",
+    "liveServer.settings.port": 5515,
+    "liveServer.settings.host": "127.0.0.1"
+  }
+}

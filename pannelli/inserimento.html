@@ -1,0 +1,93 @@
+<div class="panel panel-inserimento">
+    <h2>📸 Archivia Contenuto</h2>
+
+    <form id="formOggetto" class="wizard-inserimento">
+        <div class="wizard-progress" aria-label="Stato compilazione">
+            <span class="wizard-step-dot is-active" data-step-dot="1">1 Foto</span>
+            <span class="wizard-step-dot" data-step-dot="2">2 Stanza/Mobile</span>
+            <span class="wizard-step-dot" data-step-dot="3">3 Scatola</span>
+            <span class="wizard-step-dot" data-step-dot="4">4 Riepilogo</span>
+        </div>
+
+        <section class="wizard-step is-active" data-step="1">
+            <h3>1. Acquisizione Foto</h3>
+            <div class="form-group">
+                <label for="fotoOggetto" class="btn-camera">📷 SCATTA O CARICA FOTO OGGETTO</label>
+                <input type="file" id="fotoOggetto" accept="image/*" capture="environment" hidden>
+                <img id="preview" class="img-preview" alt="Anteprima oggetto" style="display:none">
+                <div class="wizard-inline-actions">
+                    <small id="imgApprovalMsg">Foto non acquisita.</small>
+                </div>
+            </div>
+        </section>
+
+        <section class="wizard-step" data-step="3">
+            <h3>3. Assegna Scatola</h3>
+            <div class="form-group">
+                <label for="selScatola">Scatola *</label>
+                <select id="selScatola" required></select>
+                <div class="wizard-spacer-top">
+                    <button id="btnCreateScatola" type="button" class="toggle-btn">Crea Nuova Scatola</button>
+                </div>
+                <small id="scatolaModeMsg">Seleziona una scatola esistente (puo contenere oggetti di stanze diverse). Per crearne una nuova, scegli prima la stanza al passo 2.</small>
+            </div>
+        </section>
+
+        <section class="wizard-step" data-step="2">
+            <h3>2. Assegna Stanza e Mobile</h3>
+            <div class="form-group">
+                <label for="selStanza">Stanza *</label>
+                <select id="selStanza" required></select>
+            </div>
+
+            <div class="form-group">
+                <label for="selMobile">Mobile (opzionale, legato alla stanza)</label>
+                <select id="selMobile"></select>
+            </div>
+        </section>
+
+        <section class="wizard-step" data-step="4">
+            <h3>4. Riepilogo e Salvataggio</h3>
+
+            <div class="form-group">
+                <label for="nomeOggetto">Cosa c'e nella foto? *</label>
+                <input type="text" id="nomeOggetto" placeholder="Es: Libri storia, Posate..." required>
+            </div>
+
+            <div class="form-group">
+                <label for="noteOggetto">Note (opzionali)</label>
+                <textarea id="noteOggetto" placeholder="Aggiungi dettagli utili..."></textarea>
+            </div>
+
+            <div class="wizard-summary" id="wizardSummary">
+                <p><strong>Foto:</strong> <span id="summaryFoto">Non caricata</span></p>
+                <p><strong>Scatola:</strong> <span id="summaryScatola">Non selezionata</span></p>
+                <p><strong>Stanza:</strong> <span id="summaryStanza">Non selezionata</span></p>
+                <p><strong>Mobile:</strong> <span id="summaryMobile">Nessuno</span></p>
+            </div>
+
+            <button type="submit" class="btn-save">SALVA OGGETTO</button>
+        </section>
+
+        <div class="wizard-nav">
+            <button type="button" id="btnPrevStep" class="wizard-btn-secondary">Indietro</button>
+            <button type="button" id="btnNextStep" class="wizard-btn-primary">Avanti</button>
+        </div>
+    </form>
+
+    <section id="acqResultPanel" class="acq-result-panel" hidden>
+        <h3>Acquisizione completata</h3>
+        <img id="acqResultImage" class="acq-result-image" alt="Foto acquisita" style="display:none">
+        <div class="acq-result-summary">
+            <p><strong>Oggetto:</strong> <span id="acqResultNome">-</span></p>
+            <p><strong>Scatola:</strong> <span id="acqResultScatola">-</span></p>
+            <p><strong>Stanza:</strong> <span id="acqResultStanza">-</span></p>
+            <p><strong>Mobile:</strong> <span id="acqResultMobile">Nessuno</span></p>
+            <p><strong>Note:</strong> <span id="acqResultNote">-</span></p>
+        </div>
+        <div class="acq-result-actions">
+            <button type="button" id="btnNewAcquisition" class="wizard-btn-primary">Nuova acquisizione</button>
+            <button type="button" id="btnDeleteAcquisition" class="wizard-btn-danger">Elimina</button>
+        </div>
+    </section>
+</div>

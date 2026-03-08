@@ -1,0 +1,39 @@
+-- WARNING: This schema is for context only and is not meant to be run.
+-- Table order and constraints may not be valid for execution.
+
+CREATE TABLE public.mobili (
+  id bigint GENERATED ALWAYS AS IDENTITY NOT NULL,
+  idstanza bigint NOT NULL,
+  nome text NOT NULL,
+  note text,
+  foto text,
+  CONSTRAINT mobili_pkey PRIMARY KEY (id),
+  CONSTRAINT mobili_idstanza_fkey FOREIGN KEY (idstanza) REFERENCES public.stanze(id)
+);
+CREATE TABLE public.oggetti (
+  id bigint GENERATED ALWAYS AS IDENTITY NOT NULL,
+  nome text,
+  idscatola bigint NOT NULL,
+  idstanza bigint NOT NULL,
+  idmobile bigint,
+  pathfoto text NOT NULL,
+  thumbnail text,
+  note text,
+  CONSTRAINT oggetti_pkey PRIMARY KEY (id),
+  CONSTRAINT oggetti_idscatola_fkey FOREIGN KEY (idscatola) REFERENCES public.scatole(id),
+  CONSTRAINT oggetti_idstanza_fkey FOREIGN KEY (idstanza) REFERENCES public.stanze(id),
+  CONSTRAINT oggetti_idmobile_fkey FOREIGN KEY (idmobile) REFERENCES public.mobili(id)
+);
+CREATE TABLE public.scatole (
+  id bigint GENERATED ALWAYS AS IDENTITY NOT NULL,
+  nome text,
+  pathfoto text,
+  note text,
+  CONSTRAINT scatole_pkey PRIMARY KEY (id)
+);
+CREATE TABLE public.stanze (
+  id bigint GENERATED ALWAYS AS IDENTITY NOT NULL,
+  nome text NOT NULL UNIQUE,
+  note text,
+  CONSTRAINT stanze_pkey PRIMARY KEY (id)
+);

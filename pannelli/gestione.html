@@ -1,0 +1,74 @@
+<div class="panel">
+    <h3>🔍 Ricerca Visuale</h3>
+    <div class="gestione-sticky">
+        <input type="text" id="searchInp" placeholder="Cerca per descrizione..." class="search-bar" style="margin-bottom: 10px;">
+        <div class="gestione-filters">
+            <label>
+                Numero scatola
+                <select id="filterGestioneScatola">
+                    <option value="">Tutte le scatole</option>
+                </select>
+            </label>
+            <label>
+                Nome stanza
+                <select id="filterGestioneStanza">
+                    <option value="">Tutte le stanze</option>
+                </select>
+            </label>
+            <label>
+                Nome mobile
+                <select id="filterGestioneMobile">
+                    <option value="">Tutti i mobili</option>
+                </select>
+            </label>
+        </div>
+        <p class="gestione-help">Click su un'immagine: selezione + filtro scatola. Usa i pulsanti per modificare/eliminare.</p>
+        <div class="gestione-selection-actions">
+            <button id="btnGestioneEditSelected" type="button" disabled>Modifica selezionata</button>
+            <button id="btnGestioneDeleteSelected" type="button" class="danger" disabled>Elimina selezionata</button>
+        </div>
+    </div>
+    <div id="grigliaOggetti" class="search-grid">
+        <!-- Risultati -->
+    </div>
+
+    <div id="gestioneModalOverlay" class="gestione-modal-overlay" hidden>
+        <div class="gestione-modal" role="dialog" aria-modal="true" aria-labelledby="gestioneModalTitle">
+            <div class="gestione-modal-top">
+                <h4 id="gestioneModalTitle">Modifica Oggetto</h4>
+                <button id="closeGestioneModal" type="button">Chiudi</button>
+            </div>
+            <section class="gestione-modal-preview">
+                <img id="gestionePreviewImg" alt="Anteprima oggetto" hidden>
+                <p id="gestionePreviewMeta" class="gestione-preview-meta"></p>
+            </section>
+            <form id="gestioneEditForm" class="gestione-modal-form">
+                <input type="hidden" id="gestioneOggettoId">
+                <label>
+                    Descrizione
+                    <input id="gestioneOggettoNome" type="text">
+                </label>
+                <label>
+                    Numero scatola
+                    <select id="gestioneOggettoScatola" required></select>
+                </label>
+                <label>
+                    Nome stanza
+                    <select id="gestioneOggettoStanza" required></select>
+                </label>
+                <label>
+                    Nome mobile
+                    <select id="gestioneOggettoMobile"></select>
+                </label>
+                <label>
+                    Note
+                    <textarea id="gestioneOggettoNote"></textarea>
+                </label>
+                <div class="gestione-modal-actions">
+                    <button type="submit" class="primary">Salva modifiche</button>
+                    <button type="button" id="deleteGestioneOggetto" class="danger">Elimina</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>

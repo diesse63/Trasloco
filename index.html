@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Trasloco Pro</title>
+    <link rel="stylesheet" href="styles/style.css">
+    <!-- Favicon per evitare l'errore 404 -->
+    <link rel="icon" href="data:,">
+</head>
+<body>
+    <div id="header">
+        <h1>
+            📦 Trasloco Smart
+            <button id="btnBackupControl" type="button" title="Backup/Ripristino dati" aria-label="Backup o ripristino dati">💾</button>
+        </h1>
+    </div>
+    <input id="backupRestoreFile" type="file" accept="application/json" hidden>
+
+    <!-- Contenitore dinamico -->
+    <main id="contenitorePannelli">
+        <div style="padding: 20px;">Caricamento in corso...</div>
+    </main>
+
+    <!-- Menu Navigazione Inferiore -->
+    <nav class="bottom-nav">
+        <button id="nav-inserimento">📸 <span>Archivia</span></button>
+        <button id="nav-gestione">🔍 <span>Cerca</span></button>
+        <button id="nav-stanze">🏠 <span>Stanze</span></button>
+        <button id="nav-scatole">📦 <span>Scatole</span></button>
+    </nav>
+
+    <!-- Includiamo Supabase e App -->
+    <script type="module" src="scripts/app.js"></script>
+</body>
+</html>

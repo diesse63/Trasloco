@@ -1,0 +1,290 @@
+<section class="servizi-panel">
+    <style>
+        .servizi-panel {
+            --s-accent: #0f766e;
+            --s-accent-2: #c2410c;
+            --s-card: #fff;
+            --s-line: #d6d3d1;
+            --s-bg: #fffcf5;
+            background: linear-gradient(145deg, rgba(15, 118, 110, 0.08), rgba(194, 65, 12, 0.08));
+            border: 1px solid var(--s-line);
+            border-radius: 16px;
+            padding: 16px;
+        }
+
+        .servizi-toolbar {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+            gap: 10px;
+            margin-bottom: 14px;
+            padding: 12px;
+            background: var(--s-bg);
+            border: 1px solid var(--s-line);
+            border-radius: 12px;
+        }
+
+        .servizi-card {
+            background: var(--s-card);
+            border: 1px solid var(--s-line);
+            border-radius: 12px;
+            padding: 12px;
+        }
+
+        .servizi-modal-form {
+            display: grid;
+            gap: 8px;
+            margin-bottom: 10px;
+        }
+
+        .servizi-card input,
+        .servizi-card textarea,
+        .servizi-card select,
+        .servizi-modal input,
+        .servizi-modal textarea,
+        .servizi-modal select,
+        .servizi-toolbar input {
+            width: 100%;
+            max-width: 100%;
+            box-sizing: border-box;
+            border: 1px solid var(--s-line);
+            border-radius: 8px;
+            padding: 8px;
+            font: inherit;
+        }
+
+        .servizi-card textarea,
+        .servizi-modal textarea {
+            min-height: 56px;
+            resize: vertical;
+        }
+
+        .azioni {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        .azioni button,
+        .servizi-toolbar button {
+            border: 1px solid var(--s-line);
+            border-radius: 999px;
+            padding: 7px 12px;
+            cursor: pointer;
+            font-weight: 600;
+            background: #fff;
+        }
+
+        .azioni .primary,
+        .servizi-toolbar button {
+            background: var(--s-accent);
+            color: #fff;
+            border-color: var(--s-accent);
+        }
+
+        .tabella-wrap {
+            overflow: auto;
+            max-height: 250px;
+            border: 1px solid var(--s-line);
+            border-radius: 8px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 14px;
+        }
+
+        th,
+        td {
+            border-bottom: 1px solid var(--s-line);
+            text-align: left;
+            padding: 7px;
+            vertical-align: top;
+        }
+
+        th {
+            position: sticky;
+            top: 0;
+            background: #fafaf9;
+        }
+
+        .mini-btn {
+            border: 1px solid var(--s-line);
+            border-radius: 6px;
+            background: white;
+            padding: 3px 7px;
+            cursor: pointer;
+            margin-right: 4px;
+            margin-bottom: 4px;
+            font-size: 12px;
+        }
+
+        .servizi-msg {
+            min-height: 22px;
+            margin-bottom: 8px;
+            font-weight: 600;
+        }
+
+        .servizi-msg.ok {
+            color: #047857;
+        }
+
+        .servizi-msg.err {
+            color: #b91c1c;
+        }
+
+        .servizi-head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+
+        .servizi-head h3 {
+            margin: 0;
+        }
+
+        .servizi-modal-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(28, 25, 23, 0.55);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 14px;
+            z-index: 1000;
+        }
+
+        .servizi-modal-overlay.is-hidden {
+            display: none;
+        }
+
+        .servizi-modal {
+            width: min(520px, 100%);
+            max-height: 90vh;
+            overflow: auto;
+            background: #fff;
+            border: 1px solid var(--s-line);
+            border-radius: 12px;
+            padding: 12px;
+            box-shadow: 0 14px 34px rgba(28, 25, 23, 0.24);
+        }
+
+        .servizi-modal.is-hidden {
+            display: none;
+        }
+
+        .servizi-modal-top {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 10px;
+        }
+
+        .servizi-modal-top h4 {
+            margin: 0;
+        }
+
+        .close-modal {
+            border: 1px solid var(--s-line);
+            border-radius: 8px;
+            background: #fff;
+            padding: 5px 9px;
+            cursor: pointer;
+            font-weight: 700;
+        }
+
+        .scatole-filters {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 10px;
+            margin: 10px 0 12px;
+            padding: 10px;
+            border: 1px solid var(--s-line);
+            border-radius: 10px;
+            background: #fffcf5;
+        }
+
+        .scatole-filters label {
+            display: grid;
+            gap: 4px;
+            font-weight: 600;
+            color: #44403c;
+        }
+    </style>
+
+    <div id="serviziMsg" class="servizi-msg"></div>
+
+    <article class="servizi-card">
+        <div class="servizi-head">
+            <h3>Scatole</h3>
+            <button id="openScatolaModal" type="button">Nuova Scatola</button>
+        </div>
+        <p>Puoi creare una nuova scatola oppure selezionare <strong>Modifica</strong> dalla tabella per aggiornarne una esistente.</p>
+        <section class="scatole-filters" aria-label="Filtri scatole">
+            <label>
+                Nome scatola
+                <select id="filterScatolaNome">
+                    <option value="">Tutti i nomi</option>
+                </select>
+            </label>
+            <label>
+                Stanza
+                <select id="filterScatolaStanza">
+                    <option value="">Tutte le stanze</option>
+                </select>
+            </label>
+        </section>
+        <div class="tabella-wrap">
+            <table>
+                <thead>
+                    <tr><th>Nome</th><th>Stanze presenti</th><th>Mobili</th><th>Quantita oggetti</th><th>Azioni</th></tr>
+                </thead>
+                <tbody id="tbScatole"></tbody>
+            </table>
+        </div>
+    </article>
+
+    <div id="serviziModalOverlay" class="servizi-modal-overlay is-hidden" aria-hidden="true">
+        <div id="modalScatole" class="servizi-modal is-hidden" role="dialog" aria-modal="true" aria-labelledby="modalTitleScatole">
+            <div class="servizi-modal-top">
+                <h4 id="modalTitleScatole">Gestione Scatola</h4>
+                <button class="close-modal" type="button" data-close-modal="scatole">Chiudi</button>
+            </div>
+            <form id="formScatole" class="servizi-modal-form">
+                <input type="hidden" id="scatolaId">
+                <label id="scatolaNomeField">
+                    Nome
+                    <input id="scatolaNome" type="text">
+                </label>
+                <label>
+                    Stanze collegate (sola lettura)
+                    <textarea id="scatolaStanza" readonly></textarea>
+                </label>
+                <label>
+                    Mobili collegati (sola lettura)
+                    <textarea id="scatolaMobile" readonly></textarea>
+                </label>
+                <label>
+                    Foto
+                    <input id="scatolaFotoFile" type="file" accept="image/*" capture="environment" style="display:none;">
+                    <div class="azioni">
+                        <button id="btnScatolaFoto" type="button">Seleziona/Aggiorna Foto</button>
+                        <button id="btnRimuoviScatolaFoto" type="button">Rimuovi Foto</button>
+                    </div>
+                    <small id="scatolaFotoInfo">Nessuna foto selezionata</small>
+                    <img id="scatolaFotoPreview" alt="Anteprima foto scatola" style="display:none; margin-top:8px; max-width:100%; max-height:140px; border:1px solid var(--s-line); border-radius:8px;">
+                </label>
+                <label>
+                    Note
+                    <textarea id="scatolaNote"></textarea>
+                </label>
+                <div class="azioni">
+                    <button class="primary" type="submit" id="submitScatola">Salva</button>
+                    <button type="button" id="resetScatola">Annulla Modifica</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</section>
