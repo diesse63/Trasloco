@@ -7,6 +7,7 @@ header { background: white; padding: 10px; text-align: center; box-shadow: 0 2px
 	align-items: center;
 	gap: 8px;
 	margin: 0;
+	position: relative;
 }
 
 #btnBackupControl {
@@ -17,6 +18,40 @@ header { background: white; padding: 10px; text-align: center; box-shadow: 0 2px
 	padding: 4px 8px;
 	font-size: 16px;
 	line-height: 1;
+}
+
+.backup-menu {
+	position: relative;
+	display: inline-flex;
+}
+
+.backup-menu-panel {
+	position: absolute;
+	top: calc(100% + 6px);
+	right: 0;
+	min-width: 150px;
+	background: #fff;
+	border: 1px solid #cbd5e1;
+	border-radius: 10px;
+	box-shadow: 0 8px 20px rgba(15, 23, 42, 0.18);
+	overflow: hidden;
+	z-index: 1100;
+}
+
+.backup-menu-panel button {
+	width: 100%;
+	text-align: left;
+	padding: 9px 11px;
+	border: none;
+	background: #fff;
+	cursor: pointer;
+	font-size: 14px;
+	font-weight: 600;
+	color: #1e293b;
+}
+
+.backup-menu-panel button:hover {
+	background: #f8fafc;
 }
 
 .network-badge {

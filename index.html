@@ -18,7 +18,13 @@
         <h1>
             📦 Trasloco Smart
             <span id="networkBadge" class="network-badge" aria-live="polite">Controllo rete...</span>
-            <button id="btnBackupControl" type="button" title="Backup/Ripristino dati" aria-label="Backup o ripristino dati">💾</button>
+            <div class="backup-menu">
+                <button id="btnBackupControl" type="button" title="Backup/Ripristino dati" aria-label="Apri menu backup" aria-haspopup="true" aria-expanded="false">💾</button>
+                <div id="backupMenuPanel" class="backup-menu-panel" hidden>
+                    <button type="button" data-backup-action="save">Salvataggio</button>
+                    <button type="button" data-backup-action="restore">Ripristino</button>
+                </div>
+            </div>
         </h1>
     </div>
 

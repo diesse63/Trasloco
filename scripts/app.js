@@ -2988,53 +2988,80 @@ async function chooseDriveBackupForRestore() {
 
 function initBackupControl() {
     const btn = document.getElementById('btnBackupControl');
-    if (!btn) return;
+    const panel = document.getElementById('backupMenuPanel');
+    if (!btn || !panel) return;
 
-    btn.onclick = async () => {
-        const action = window.prompt('Backup dati su Google Drive:\n- digita S per SALVARE backup\n- digita R per RIPRISTINARE backup');
-        const normalized = String(action || '').trim().toUpperCase();
-        if (!normalized) return;
-
-        if (normalized === 'S') {
-            try {
-                const backup = await buildLocalBackup();
-                const created = await uploadBackupToDrive(backup);
-                const retention = await enforceDriveRetention();
-                const summary = backup.integrity?.summary || buildBackupSummary(backup);
-                const checksumShort = String(backup.integrity?.checksum || '').slice(0, 18);
-                window.alert(`Backup su Drive completato.\nFile: ${created?.name || '-'}\nStanze: ${summary.stanzeCount}\nMobili: ${summary.mobiliCount}\nScatole: ${summary.scatoleCount}\nOggetti: ${summary.oggettiCount}\nFile multimediali: ${summary.filesCount}\nRetention: ultime ${DRIVE_RETENTION_COUNT} copie (eliminate ${retention.deleted})\nChecksum: ${checksumShort}...`);
-            } catch (error) {
-                window.alert(`Backup fallito: ${error.message || String(error)}`);
-            }
-            return;
-        }
-
-        if (normalized === 'R') {
-            try {
-                const selected = await chooseDriveBackupForRestore();
-                const confirmMsg = `Ripristinare il backup ${selected.name}?\nI dati attuali su Supabase verranno sovrascritti.`;
-                if (!window.confirm(confirmMsg)) return;
-
-                const payload = await downloadDriveBackupById(selected.id);
-                const validation = await validateBackupIntegrity(payload);
-                if (!validation.ok) {
-                    if (validation.reason === 'missing-checksum') {
-                        const proceedLegacy = window.confirm('Backup senza checksum: integrita non verificabile. Continuare comunque?');
-                        if (!proceedLegacy) return;
-                    } else {
-                        throw new Error('Integrita backup non valida (checksum diverso). Ripristino bloccato.');
-                    }
-                }
-
-                await restoreFromBackupPayload(payload);
-                window.alert('Ripristino da Drive completato con successo. Ricarico i pannelli.');
-                caricaPannello('inserimento');
-            } catch (error) {
-                window.alert(`Ripristino fallito: ${error.message || String(error)}`);
-            }
-            return;
-        }
-
-        window.alert('Azione non riconosciuta. Usa S o R.');
+    const closeMenu = () => {
+        panel.hidden = true;
+        btn.setAttribute('aria-expanded', 'false');
     };
+
+    const openMenu = () => {
+        panel.hidden = false;
+        btn.setAttribute('aria-expanded', 'true');
+    };
+
+    const runBackupSave = async () => {
+        try {
+            const backup = await buildLocalBackup();
+            const created = await uploadBackupToDrive(backup);
+            const retention = await enforceDriveRetention();
+            const summary = backup.integrity?.summary || buildBackupSummary(backup);
+            const checksumShort = String(backup.integrity?.checksum || '').slice(0, 18);
+            window.alert(`Backup su Drive completato.\nFile: ${created?.name || '-'}\nStanze: ${summary.stanzeCount}\nMobili: ${summary.mobiliCount}\nScatole: ${summary.scatoleCount}\nOggetti: ${summary.oggettiCount}\nFile multimediali: ${summary.filesCount}\nRetention: ultime ${DRIVE_RETENTION_COUNT} copie (eliminate ${retention.deleted})\nChecksum: ${checksumShort}...`);
+        } catch (error) {
+            window.alert(`Backup fallito: ${error.message || String(error)}`);
+        }
+    };
+
+    const runBackupRestore = async () => {
+        try {
+            const selected = await chooseDriveBackupForRestore();
+            const confirmMsg = `Ripristinare il backup ${selected.name}?\nI dati attuali su Supabase verranno sovrascritti.`;
+            if (!window.confirm(confirmMsg)) return;
+
+            const payload = await downloadDriveBackupById(selected.id);
+            const validation = await validateBackupIntegrity(payload);
+            if (!validation.ok) {
+                if (validation.reason === 'missing-checksum') {
+                    const proceedLegacy = window.confirm('Backup senza checksum: integrita non verificabile. Continuare comunque?');
+                    if (!proceedLegacy) return;
+                } else {
+                    throw new Error('Integrita backup non valida (checksum diverso). Ripristino bloccato.');
+                }
+            }
+
+            await restoreFromBackupPayload(payload);
+            window.alert('Ripristino da Drive completato con successo. Ricarico i pannelli.');
+            caricaPannello('inserimento');
+        } catch (error) {
+            window.alert(`Ripristino fallito: ${error.message || String(error)}`);
+        }
+    };
+
+    btn.onclick = (event) => {
+        event.stopPropagation();
+        if (panel.hidden) openMenu();
+        else closeMenu();
+    };
+
+    panel.onclick = async (event) => {
+        const actionBtn = event.target.closest('[data-backup-action]');
+        if (!actionBtn) return;
+
+        const action = actionBtn.getAttribute('data-backup-action');
+        closeMenu();
+        if (action === 'save') await runBackupSave();
+        if (action === 'restore') await runBackupRestore();
+    };
+
+    document.addEventListener('click', (event) => {
+        if (event.target === btn) return;
+        if (panel.contains(event.target)) return;
+        closeMenu();
+    });
+
+    document.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape') closeMenu();
+    });
 }
