@@ -3,8 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#2563eb">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
     <title>Trasloco Pro</title>
+    <link rel="manifest" href="manifest.webmanifest">
     <link rel="stylesheet" href="styles/style.css">
+    <link rel="apple-touch-icon" href="assets/icons/icon-192.svg">
     <!-- Favicon per evitare l'errore 404 -->
     <link rel="icon" href="data:,">
 </head>
@@ -29,6 +34,16 @@
         <button id="nav-stanze">🏠 <span>Stanze</span></button>
         <button id="nav-scatole">📦 <span>Scatole</span></button>
     </nav>
+
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('./sw.js').catch((error) => {
+                    console.error('Registrazione Service Worker fallita:', error);
+                });
+            });
+        }
+    </script>
 
     <!-- Includiamo Supabase e App -->
     <script type="module" src="scripts/app.js"></script>
