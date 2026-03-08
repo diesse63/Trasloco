@@ -4,6 +4,17 @@ const STORAGE_BUCKET_KEY = 'trasloco.storageBucket';
 const PREFERRED_STORAGE_BUCKET = 'Oggetti';
 const STORAGE_BUCKET_FALLBACKS = [PREFERRED_STORAGE_BUCKET, 'oggetti', 'publics', 'public', 'trasloco', 'uploads', 'images', 'immagini'];
 const GESTIONE_PREFILL_KEY = 'trasloco.gestionePrefill';
+const DRIVE_FOLDER_ID = '1X__ukmJsar5sShvx67KCzKpj-wA03Zv7';
+const DRIVE_BACKUP_PREFIX = 'trasloco-backup-';
+const DRIVE_RETENTION_COUNT = 3;
+const DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive.file';
+const DRIVE_CLIENT_ID_STORAGE_KEY = 'trasloco.driveClientId';
+
+const driveState = {
+    accessToken: '',
+    tokenExpiresAt: 0,
+    clientId: '',
+};
 
 const storageState = {
     bucket: (() => {
@@ -146,9 +157,26 @@ document.addEventListener('DOMContentLoaded', () => {
     if (btnStanze) btnStanze.onclick = () => caricaPannello('stanze');
     if (btnScatole) btnScatole.onclick = () => caricaPannello('scatole');
 
+    initNetworkBadge();
     initBackupControl();
     caricaPannello('inserimento');
 });
+
+function initNetworkBadge() {
+    const badge = document.getElementById('networkBadge');
+    if (!badge) return;
+
+    const updateNetworkBadge = () => {
+        const online = navigator.onLine;
+        badge.textContent = online ? 'Online' : 'Offline';
+        badge.classList.toggle('is-online', online);
+        badge.classList.toggle('is-offline', !online);
+    };
+
+    window.addEventListener('online', updateNetworkBadge);
+    window.addEventListener('offline', updateNetworkBadge);
+    updateNetworkBadge();
+}
 
 // --- LOGICA INSERIMENTO ---
 async function initInserimento() {
@@ -2423,11 +2451,6 @@ function consumeGestionePrefill() {
     }
 }
 
-function isPhoneDevice() {
-    const ua = (navigator.userAgent || '').toLowerCase();
-    return /iphone|ipod|android.+mobile|windows phone|opera mini/i.test(ua);
-}
-
 function formatBackupTimestamp(date = new Date()) {
     const pad = (n) => String(n).padStart(2, '0');
     return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}_${pad(date.getHours())}-${pad(date.getMinutes())}-${pad(date.getSeconds())}`;
@@ -2777,28 +2800,209 @@ function readJsonFile(file) {
     });
 }
 
+function resolveDriveClientId() {
+    if (driveState.clientId) return driveState.clientId;
+
+    try {
+        const saved = window.localStorage.getItem(DRIVE_CLIENT_ID_STORAGE_KEY);
+        if (saved) {
+            driveState.clientId = saved;
+            return driveState.clientId;
+        }
+    } catch {
+        // Ignore storage errors.
+    }
+
+    const fromWindow = typeof window.TRASLOCO_GOOGLE_CLIENT_ID === 'string'
+        ? window.TRASLOCO_GOOGLE_CLIENT_ID.trim()
+        : '';
+    if (fromWindow) {
+        driveState.clientId = fromWindow;
+        try {
+            window.localStorage.setItem(DRIVE_CLIENT_ID_STORAGE_KEY, driveState.clientId);
+        } catch {
+            // Ignore storage errors.
+        }
+        return driveState.clientId;
+    }
+
+    const entered = window.prompt('Inserisci Google OAuth Client ID (Web) per backup su Drive:');
+    const value = String(entered || '').trim();
+    if (!value) {
+        throw new Error('Client ID Google mancante.');
+    }
+    driveState.clientId = value;
+    try {
+        window.localStorage.setItem(DRIVE_CLIENT_ID_STORAGE_KEY, driveState.clientId);
+    } catch {
+        // Ignore storage errors.
+    }
+    return driveState.clientId;
+}
+
+function isDriveTokenValid() {
+    return Boolean(driveState.accessToken) && Date.now() < driveState.tokenExpiresAt - 10000;
+}
+
+async function ensureDriveAccessToken() {
+    if (isDriveTokenValid()) return driveState.accessToken;
+
+    if (!window.google?.accounts?.oauth2) {
+        throw new Error('Google Identity Services non disponibile. Ricarica la pagina.');
+    }
+
+    const clientId = resolveDriveClientId();
+    const tokenResponse = await new Promise((resolve, reject) => {
+        const tokenClient = window.google.accounts.oauth2.initTokenClient({
+            client_id: clientId,
+            scope: DRIVE_SCOPE,
+            callback: (response) => {
+                if (response?.error) {
+                    reject(new Error(response.error_description || response.error || 'Autorizzazione Drive fallita.'));
+                    return;
+                }
+                resolve(response);
+            },
+        });
+
+        tokenClient.requestAccessToken({ prompt: 'consent' });
+    });
+
+    driveState.accessToken = tokenResponse.access_token || '';
+    driveState.tokenExpiresAt = Date.now() + (Number(tokenResponse.expires_in || 3600) * 1000);
+    if (!driveState.accessToken) {
+        throw new Error('Token Drive non ricevuto.');
+    }
+    return driveState.accessToken;
+}
+
+async function driveFetchJson(url, options = {}) {
+    const token = await ensureDriveAccessToken();
+    const response = await fetch(url, {
+        ...options,
+        headers: {
+            Authorization: `Bearer ${token}`,
+            ...(options.headers || {}),
+        },
+    });
+
+    if (!response.ok) {
+        const text = await response.text();
+        throw new Error(`Drive API ${response.status}: ${text || response.statusText}`);
+    }
+
+    if (response.status === 204) return null;
+    return response.json();
+}
+
+async function uploadBackupToDrive(backupPayload) {
+    const filename = `${DRIVE_BACKUP_PREFIX}${formatBackupTimestamp()}.json`;
+    const metadata = {
+        name: filename,
+        parents: [DRIVE_FOLDER_ID],
+        mimeType: 'application/json',
+    };
+
+    const boundary = `trasloco_${Date.now()}`;
+    const body = [
+        `--${boundary}`,
+        'Content-Type: application/json; charset=UTF-8',
+        '',
+        JSON.stringify(metadata),
+        `--${boundary}`,
+        'Content-Type: application/json; charset=UTF-8',
+        '',
+        JSON.stringify(backupPayload),
+        `--${boundary}--`,
+    ].join('\r\n');
+
+    const created = await driveFetchJson('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name,createdTime', {
+        method: 'POST',
+        headers: {
+            'Content-Type': `multipart/related; boundary=${boundary}`,
+        },
+        body,
+    });
+
+    return created;
+}
+
+async function listDriveBackups() {
+    const q = encodeURIComponent(`'${DRIVE_FOLDER_ID}' in parents and trashed=false and name contains '${DRIVE_BACKUP_PREFIX}' and mimeType='application/json'`);
+    const fields = encodeURIComponent('files(id,name,createdTime,size),nextPageToken');
+    const result = await driveFetchJson(`https://www.googleapis.com/drive/v3/files?q=${q}&orderBy=createdTime desc&fields=${fields}&pageSize=50`);
+    return Array.isArray(result?.files) ? result.files : [];
+}
+
+async function enforceDriveRetention() {
+    const backups = await listDriveBackups();
+    const obsolete = backups.slice(DRIVE_RETENTION_COUNT);
+
+    for (const file of obsolete) {
+        await driveFetchJson(`https://www.googleapis.com/drive/v3/files/${encodeURIComponent(file.id)}`, {
+            method: 'DELETE',
+        });
+    }
+
+    return {
+        kept: backups.slice(0, DRIVE_RETENTION_COUNT),
+        deleted: obsolete.length,
+    };
+}
+
+async function downloadDriveBackupById(fileId) {
+    const token = await ensureDriveAccessToken();
+    const response = await fetch(`https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}?alt=media`, {
+        headers: {
+            Authorization: `Bearer ${token}`,
+        },
+    });
+
+    if (!response.ok) {
+        const text = await response.text();
+        throw new Error(`Download backup da Drive fallito (${response.status}): ${text || response.statusText}`);
+    }
+
+    return response.json();
+}
+
+async function chooseDriveBackupForRestore() {
+    const backups = await listDriveBackups();
+    if (backups.length === 0) {
+        throw new Error('Nessun backup trovato nella cartella Drive configurata.');
+    }
+
+    const lines = backups.map((file, index) => {
+        const created = file.createdTime ? new Date(file.createdTime).toLocaleString('it-IT') : 'data sconosciuta';
+        return `${index + 1}) ${file.name} - ${created}`;
+    });
+
+    const choice = window.prompt(`Seleziona backup da ripristinare (numero):\n${lines.join('\n')}`);
+    const idx = Number(choice);
+    if (!Number.isInteger(idx) || idx < 1 || idx > backups.length) {
+        throw new Error('Selezione backup non valida.');
+    }
+
+    return backups[idx - 1];
+}
+
 function initBackupControl() {
     const btn = document.getElementById('btnBackupControl');
-    const fileInput = document.getElementById('backupRestoreFile');
-    if (!btn || !fileInput) return;
+    if (!btn) return;
 
     btn.onclick = async () => {
-        if (isPhoneDevice()) {
-            window.alert('Backup/Ripristino disponibile solo da PC.');
-            return;
-        }
-
-        const action = window.prompt('Backup dati locale:\n- digita S per SALVARE backup\n- digita R per RIPRISTINARE backup');
+        const action = window.prompt('Backup dati su Google Drive:\n- digita S per SALVARE backup\n- digita R per RIPRISTINARE backup');
         const normalized = String(action || '').trim().toUpperCase();
         if (!normalized) return;
 
         if (normalized === 'S') {
             try {
                 const backup = await buildLocalBackup();
-                downloadBackupFile(backup);
+                const created = await uploadBackupToDrive(backup);
+                const retention = await enforceDriveRetention();
                 const summary = backup.integrity?.summary || buildBackupSummary(backup);
                 const checksumShort = String(backup.integrity?.checksum || '').slice(0, 18);
-                window.alert(`Backup completato.\nStanze: ${summary.stanzeCount}\nMobili: ${summary.mobiliCount}\nScatole: ${summary.scatoleCount}\nOggetti: ${summary.oggettiCount}\nFile: ${summary.filesCount}\nChecksum: ${checksumShort}...`);
+                window.alert(`Backup su Drive completato.\nFile: ${created?.name || '-'}\nStanze: ${summary.stanzeCount}\nMobili: ${summary.mobiliCount}\nScatole: ${summary.scatoleCount}\nOggetti: ${summary.oggettiCount}\nFile multimediali: ${summary.filesCount}\nRetention: ultime ${DRIVE_RETENTION_COUNT} copie (eliminate ${retention.deleted})\nChecksum: ${checksumShort}...`);
             } catch (error) {
                 window.alert(`Backup fallito: ${error.message || String(error)}`);
             }
@@ -2806,42 +3010,31 @@ function initBackupControl() {
         }
 
         if (normalized === 'R') {
-            fileInput.value = '';
-            fileInput.click();
+            try {
+                const selected = await chooseDriveBackupForRestore();
+                const confirmMsg = `Ripristinare il backup ${selected.name}?\nI dati attuali su Supabase verranno sovrascritti.`;
+                if (!window.confirm(confirmMsg)) return;
+
+                const payload = await downloadDriveBackupById(selected.id);
+                const validation = await validateBackupIntegrity(payload);
+                if (!validation.ok) {
+                    if (validation.reason === 'missing-checksum') {
+                        const proceedLegacy = window.confirm('Backup senza checksum: integrita non verificabile. Continuare comunque?');
+                        if (!proceedLegacy) return;
+                    } else {
+                        throw new Error('Integrita backup non valida (checksum diverso). Ripristino bloccato.');
+                    }
+                }
+
+                await restoreFromBackupPayload(payload);
+                window.alert('Ripristino da Drive completato con successo. Ricarico i pannelli.');
+                caricaPannello('inserimento');
+            } catch (error) {
+                window.alert(`Ripristino fallito: ${error.message || String(error)}`);
+            }
             return;
         }
 
         window.alert('Azione non riconosciuta. Usa S o R.');
-    };
-
-    fileInput.onchange = async () => {
-        const file = fileInput.files?.[0];
-        if (!file) return;
-
-        if (isPhoneDevice()) {
-            window.alert('Ripristino disponibile solo da PC.');
-            return;
-        }
-
-        const confirmMsg = 'Il ripristino sovrascrive tutti i dati attuali su Supabase. Continuare?';
-        if (!window.confirm(confirmMsg)) return;
-
-        try {
-            const payload = await readJsonFile(file);
-            const validation = await validateBackupIntegrity(payload);
-            if (!validation.ok) {
-                if (validation.reason === 'missing-checksum') {
-                    const proceedLegacy = window.confirm('Backup senza checksum: integrita non verificabile. Continuare comunque?');
-                    if (!proceedLegacy) return;
-                } else {
-                    throw new Error('Integrita backup non valida (checksum diverso). Ripristino bloccato.');
-                }
-            }
-            await restoreFromBackupPayload(payload);
-            window.alert('Ripristino completato con successo. Ricarico i pannelli.');
-            caricaPannello('inserimento');
-        } catch (error) {
-            window.alert(`Ripristino fallito: ${error.message || String(error)}`);
-        }
     };
 }

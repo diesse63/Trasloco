@@ -17,10 +17,10 @@
     <div id="header">
         <h1>
             📦 Trasloco Smart
+            <span id="networkBadge" class="network-badge" aria-live="polite">Controllo rete...</span>
             <button id="btnBackupControl" type="button" title="Backup/Ripristino dati" aria-label="Backup o ripristino dati">💾</button>
         </h1>
     </div>
-    <input id="backupRestoreFile" type="file" accept="application/json" hidden>
 
     <!-- Contenitore dinamico -->
     <main id="contenitorePannelli">
@@ -45,6 +45,10 @@
         }
     </script>
 
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+<script>
+  window.TRASLOCO_GOOGLE_CLIENT_ID = "747941135804-gi5pu0o3n3jhlaqhrcjuabqr7ncm2mo5.apps.googleusercontent.com";
+</script>
     <!-- Includiamo Supabase e App -->
     <script type="module" src="scripts/app.js"></script>
 </body>

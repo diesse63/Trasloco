@@ -19,6 +19,28 @@ header { background: white; padding: 10px; text-align: center; box-shadow: 0 2px
 	line-height: 1;
 }
 
+.network-badge {
+	border: 1px solid #cbd5e1;
+	border-radius: 999px;
+	padding: 3px 8px;
+	font-size: 12px;
+	font-weight: 700;
+	background: #ffffff;
+	color: #334155;
+}
+
+.network-badge.is-online {
+	border-color: #10b981;
+	background: #ecfdf5;
+	color: #047857;
+}
+
+.network-badge.is-offline {
+	border-color: #ef4444;
+	background: #fef2f2;
+	color: #b91c1c;
+}
+
 /* Keep dynamic panel content visible above the fixed bottom navigation on mobile devices. */
 #contenitorePannelli {
 	padding-bottom: calc(92px + env(safe-area-inset-bottom, 0px));
