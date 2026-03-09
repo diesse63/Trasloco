@@ -701,6 +701,7 @@ async function initGestione() {
     const editNote = document.getElementById('gestioneOggettoNote');
     const previewImg = document.getElementById('gestionePreviewImg');
     const previewMeta = document.getElementById('gestionePreviewMeta');
+    const editSubmitBtn = editForm?.querySelector('button[type="submit"]');
 
     if (!searchInp || !griglia || !filterScatola || !filterStanza || !filterMobile || !modalOverlay || !editForm || !btnEditSelected || !btnDeleteSelected) return;
 
@@ -732,16 +733,47 @@ async function initGestione() {
 
     const getSelectedRow = () => gestioneState.rows.find((item) => String(item.id) === String(gestioneState.selectedRowId || '')) || null;
 
+    const isRowLockedByClosedScatola = (row) => Boolean(row?.scatola_stato === true);
+
     const syncSelectedButtonsState = () => {
-        const hasSelection = Boolean(getSelectedRow());
-        btnEditSelected.disabled = !hasSelection;
-        btnDeleteSelected.disabled = !hasSelection;
+        const selectedRow = getSelectedRow();
+        const hasSelection = Boolean(selectedRow);
+        const isLocked = isRowLockedByClosedScatola(selectedRow);
+        btnEditSelected.disabled = !hasSelection || isLocked;
+        btnDeleteSelected.disabled = !hasSelection || isLocked;
     };
 
     const buildLookupOptions = (selectEl, items, labelKey = 'nome', valueKey = 'id', emptyLabel = 'Seleziona') => {
         if (!selectEl) return;
         selectEl.innerHTML = `<option value="">${escapeHtml(emptyLabel)}</option>` +
             (items || []).map((item) => `<option value="${item[valueKey]}">${escapeHtml(item[labelKey] || String(item[valueKey]))}</option>`).join('');
+    };
+
+    const isScatolaClosedById = (scatolaId) => {
+        const targetId = String(scatolaId || '');
+        if (!targetId) return false;
+        const scatola = (gestioneState.scatole || []).find((item) => String(item.id) === targetId);
+        return Boolean(scatola?.stato === true);
+    };
+
+    const syncGestioneEditLockState = () => {
+        if (!editScatola) return;
+        const locked = isScatolaClosedById(editScatola.value || '');
+
+        [editNome, editStanza, editMobile, editNote].forEach((inputEl) => {
+            if (!inputEl) return;
+            inputEl.disabled = locked;
+        });
+
+        if (deleteBtn) deleteBtn.disabled = locked;
+        if (editSubmitBtn) editSubmitBtn.disabled = locked;
+
+        if (previewMeta) {
+            const base = previewMeta.dataset.baseMeta || previewMeta.textContent || '';
+            previewMeta.textContent = locked
+                ? `${base} | Modifica bloccata: scatola chiusa.`
+                : base;
+        }
     };
 
     const populateEditMobileOptions = (stanzaId, selectedMobileId = '') => {
@@ -842,7 +874,7 @@ async function initGestione() {
     const fetchGestioneRows = async () => {
         const [oggettiRes, scatoleRes, stanzeRes, mobiliRes] = await Promise.all([
             supabase.from('oggetti').select('id,nome,idscatola,idstanza,idmobile,pathfoto,note').order('id', { ascending: false }),
-            supabase.from('scatole').select('id,nome').order('id', { ascending: true }),
+            supabase.from('scatole').select('id,nome,stato').order('id', { ascending: true }),
             supabase.from('stanze').select('id,nome').order('nome', { ascending: true }),
             supabase.from('mobili').select('id,nome,idstanza').order('nome', { ascending: true }),
         ]);
@@ -851,6 +883,7 @@ async function initGestione() {
         if (firstError) throw firstError;
 
         const scatolaById = new Map((scatoleRes.data || []).map((row) => [String(row.id), row.nome || String(row.id)]));
+        const scatolaStatoById = new Map((scatoleRes.data || []).map((row) => [String(row.id), row.stato === true]));
         const stanzaById = new Map((stanzeRes.data || []).map((row) => [String(row.id), row.nome || '-']));
         const mobileById = new Map((mobiliRes.data || []).map((row) => [String(row.id), row.nome || '-']));
 
@@ -867,6 +900,7 @@ async function initGestione() {
             idstanza: o.idstanza,
             idmobile: o.idmobile,
             scatola_nome: scatolaById.get(String(o.idscatola)) || String(o.idscatola || '-'),
+            scatola_stato: scatolaStatoById.get(String(o.idscatola)) || false,
             stanza_nome: stanzaById.get(String(o.idstanza)) || String(o.idstanza || '-'),
             mobile_nome: o.idmobile ? (mobileById.get(String(o.idmobile)) || String(o.idmobile)) : '',
         }));
@@ -902,8 +936,12 @@ async function initGestione() {
         }
 
         if (previewMeta) {
-            previewMeta.textContent = `Scatola: ${row.scatola_nome || '-'} | Stanza: ${row.stanza_nome || '-'} | Mobile: ${row.mobile_nome || '-'}`;
+            const baseMeta = `Scatola: ${row.scatola_nome || '-'} | Stanza: ${row.stanza_nome || '-'} | Mobile: ${row.mobile_nome || '-'}`;
+            previewMeta.dataset.baseMeta = baseMeta;
+            previewMeta.textContent = baseMeta;
         }
+
+        syncGestioneEditLockState();
 
         modalOverlay.hidden = false;
     };
@@ -937,6 +975,11 @@ async function initGestione() {
 
     const deleteRowById = async (row) => {
         if (!row) return;
+
+        if (isRowLockedByClosedScatola(row)) {
+            window.alert('Oggetto collegato a scatola chiusa: eliminazione non consentita.');
+            return;
+        }
 
         const ok = window.confirm('Confermi l\'eliminazione dell\'oggetto selezionato?');
         if (!ok) return;
@@ -977,6 +1020,10 @@ async function initGestione() {
     btnEditSelected.onclick = () => {
         const row = getSelectedRow();
         if (!row) return;
+        if (isRowLockedByClosedScatola(row)) {
+            window.alert('Oggetto collegato a scatola chiusa: modifica non consentita.');
+            return;
+        }
         openEditModal(row);
     };
 
@@ -996,6 +1043,12 @@ async function initGestione() {
         const id = editId.value;
         if (!id) return;
 
+        const row = gestioneState.rows.find((item) => String(item.id) === String(id));
+        if (isRowLockedByClosedScatola(row)) {
+            window.alert('Oggetto collegato a scatola chiusa: modifica non consentita.');
+            return;
+        }
+
         const payload = {
             nome: normalizeText(editNome.value),
             idscatola: Number(editScatola.value),
@@ -1006,6 +1059,11 @@ async function initGestione() {
 
         if (!payload.idscatola || !payload.idstanza) {
             window.alert('Scatola e stanza sono obbligatorie.');
+            return;
+        }
+
+        if (isScatolaClosedById(payload.idscatola)) {
+            window.alert('Modifica non consentita: scatola chiusa.');
             return;
         }
 
@@ -1034,6 +1092,12 @@ async function initGestione() {
     if (editStanza) {
         editStanza.onchange = () => {
             populateEditMobileOptions(editStanza.value || '', '');
+        };
+    }
+
+    if (editScatola) {
+        editScatola.onchange = () => {
+            syncGestioneEditLockState();
         };
     }
 
