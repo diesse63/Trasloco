@@ -212,6 +212,43 @@
             font-weight: 600;
             color: #44403c;
         }
+
+        .stato-cell {
+            white-space: nowrap;
+        }
+
+        .stato-dot {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            margin-right: 6px;
+            vertical-align: middle;
+        }
+
+        .stato-dot.is-open {
+            background: #dc2626;
+        }
+
+        .stato-dot.is-closed {
+            background: #16a34a;
+        }
+
+        .scatola-popup-actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            padding: 8px;
+            border: 1px dashed var(--s-line);
+            border-radius: 8px;
+            background: #fffcf5;
+        }
+
+        .scatola-status-hint {
+            margin: 0;
+            color: #57534e;
+            font-size: 13px;
+        }
     </style>
 
     <div id="serviziMsg" class="servizi-msg"></div>
@@ -221,7 +258,7 @@
             <h3>Scatole</h3>
             <button id="openScatolaModal" type="button">Nuova Scatola</button>
         </div>
-        <p>Puoi creare una nuova scatola oppure selezionare <strong>Modifica</strong> dalla tabella per aggiornarne una esistente.</p>
+        <p>Puoi creare una nuova scatola oppure selezionare <strong>Visualizza</strong> dalla tabella per aprire i comandi nel popup.</p>
         <section class="scatole-filters" aria-label="Filtri scatole">
             <label>
                 Nome scatola
@@ -235,11 +272,27 @@
                     <option value="">Tutte le stanze</option>
                 </select>
             </label>
+            <label>
+                Stato etichetta
+                <select id="filterScatolaStampa">
+                    <option value="">Tutte le scatole</option>
+                    <option value="printed">Solo etichetta stampata</option>
+                    <option value="pending">Da stampare</option>
+                </select>
+            </label>
+            <label>
+                Stato scatola
+                <select id="filterScatolaStato">
+                    <option value="">Tutte</option>
+                    <option value="open">Aperte</option>
+                    <option value="closed">Chiuse</option>
+                </select>
+            </label>
         </section>
         <div class="tabella-wrap">
             <table>
                 <thead>
-                    <tr><th>Nome</th><th>Stanze presenti</th><th>Mobili</th><th>Quantita oggetti</th><th>Azioni</th></tr>
+                    <tr><th>Nome</th><th>Stanze presenti</th><th>Mobili</th><th>Quantita oggetti</th><th>Data Stampa</th><th>Stato</th><th>Azioni</th></tr>
                 </thead>
                 <tbody id="tbScatole"></tbody>
             </table>
@@ -280,6 +333,13 @@
                     Note
                     <textarea id="scatolaNote"></textarea>
                 </label>
+                <div id="scatolaQuickActions" class="scatola-popup-actions" style="display:none;">
+                    <button type="button" id="btnScatolaCmdPrint" data-action="print-scatola-label">Stampa Etichetta</button>
+                    <button type="button" id="btnScatolaCmdFoto" data-action="focus-scatola-foto">Gestisci Foto</button>
+                    <button type="button" id="btnScatolaCmdToggleStato" data-action="toggle-scatola-stato">Chiudi Scatola</button>
+                    <button type="button" id="btnScatolaCmdDelete" data-action="delete-scatola">Elimina Scatola</button>
+                </div>
+                <p id="scatolaStatusHint" class="scatola-status-hint" style="display:none;"></p>
                 <div class="azioni">
                     <button class="primary" type="submit" id="submitScatola">Salva</button>
                     <button type="button" id="resetScatola">Annulla Modifica</button>

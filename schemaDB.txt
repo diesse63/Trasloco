@@ -26,9 +26,11 @@ CREATE TABLE public.oggetti (
 );
 CREATE TABLE public.scatole (
   id bigint GENERATED ALWAYS AS IDENTITY NOT NULL,
-  nome text,
+  nome text UNIQUE,
   pathfoto text,
   note text,
+  data timestamp without time zone,
+  stato boolean NOT NULL DEFAULT false,
   CONSTRAINT scatole_pkey PRIMARY KEY (id)
 );
 CREATE TABLE public.stanze (

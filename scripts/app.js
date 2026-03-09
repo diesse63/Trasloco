@@ -9,6 +9,7 @@ const DRIVE_BACKUP_PREFIX = 'trasloco-backup-';
 const DRIVE_RETENTION_COUNT = 3;
 const DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive.file';
 const DRIVE_CLIENT_ID_STORAGE_KEY = 'trasloco.driveClientId';
+const DRIVE_LABELS_FOLDER_ID = '1kgIsiVD0a8L-_F0931S_fCNC-SNyXzNZ';
 
 const driveState = {
     accessToken: '',
@@ -332,7 +333,8 @@ async function initInserimento() {
 
         const { data: scatole, error } = await supabase
             .from('scatole')
-            .select('id,nome')
+            .select('id,nome,stato')
+            .eq('stato', false)
             .order('id', { ascending: false });
 
         if (error) {
@@ -342,6 +344,11 @@ async function initInserimento() {
 
         selScatola.innerHTML = '<option value="">Seleziona scatola</option>' +
             (scatole || []).map(s => `<option value="${s.id}">${escapeHtml(s.nome || String(s.id))}</option>`).join('');
+
+        if ((scatole || []).length === 0 && scatolaModeMsg) {
+            scatolaModeMsg.textContent = 'Nessuna scatola aperta disponibile. Crea una nuova scatola per continuare.';
+            scatolaModeMsg.style.color = '#b45309';
+        }
         refreshSummary();
     };
 
@@ -535,12 +542,18 @@ async function initInserimento() {
 
             const scatolaCheck = await supabase
                 .from('scatole')
-                .select('id')
+                .select('id,stato')
                 .eq('id', scatolaIdToUse)
                 .single();
 
             if (scatolaCheck.error || !scatolaCheck.data) {
                 window.alert(`Controllo scatola fallito: ${scatolaCheck.error?.message || 'scatola non trovata'}`);
+                return;
+            }
+
+            if (scatolaCheck.data.stato === true) {
+                window.alert('La scatola selezionata e chiusa e non puo ricevere nuovi oggetti. Seleziona una scatola aperta.');
+                await loadScatoleAll();
                 return;
             }
 
@@ -1051,6 +1064,8 @@ const serviziState = {
     filters: {
         scatolaNome: '',
         stanza: '',
+        stampaStatus: '',
+        scatolaStato: '',
     },
     scatolaFotoFile: null,
     scatolaFotoRemoved: false,
@@ -1093,7 +1108,51 @@ function getScatolaDisplayName(scatola) {
     return normalizeText(scatola?.nome) || String(scatola?.id || '');
 }
 
-function getScatolaLabelData(scatola) {
+function isScatolaClosed(scatola) {
+    return scatola?.stato === true || scatola?.stato === 'true' || scatola?.stato === 1;
+}
+
+function formatPrintDate(dateValue) {
+    if (!dateValue) return '-';
+
+    const rawValue = String(dateValue).trim();
+    const localTsMatch = rawValue.match(/^(\d{4})-(\d{2})-(\d{2})(?:[ T](\d{2}):(\d{2})(?::(\d{2})(?:\.\d+)?)?)?$/);
+    let date = null;
+
+    // Parse esplicito per timestamp senza timezone (Postgres "timestamp without time zone").
+    if (localTsMatch) {
+        const year = Number(localTsMatch[1]);
+        const month = Number(localTsMatch[2]);
+        const day = Number(localTsMatch[3]);
+        const hours = Number(localTsMatch[4] || 0);
+        const minutes = Number(localTsMatch[5] || 0);
+        const seconds = Number(localTsMatch[6] || 0);
+        date = new Date(year, month - 1, day, hours, minutes, seconds);
+    } else {
+        date = new Date(rawValue);
+    }
+
+    if (Number.isNaN(date.getTime())) {
+        return '-';
+    }
+    return new Intl.DateTimeFormat('it-IT', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+    }).format(date);
+}
+
+function getLocalPgTimestamp(dateValue = new Date()) {
+    const date = dateValue instanceof Date ? dateValue : new Date(dateValue);
+    if (Number.isNaN(date.getTime())) return null;
+
+    const pad = (n) => String(n).padStart(2, '0');
+    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
+}
+
+function getScatolaLabelData(scatola, printedAt = null) {
         const scatolaKey = String(scatola?.id || '');
         const rawNome = normalizeText(scatola?.nome) || String(scatola?.id || '-');
         const qty = serviziState.oggettiCountByScatola.get(scatolaKey) || 0;
@@ -1111,6 +1170,7 @@ function getScatolaLabelData(scatola) {
                 quantitaOggetti: qty,
                 primaryStanza,
                 otherStanze,
+            dataStampa: formatPrintDate(printedAt || scatola?.data || null),
         };
 }
 
@@ -1183,8 +1243,225 @@ function askFragileLabelChoice() {
     });
 }
 
-function printScatolaLabelA5(scatola, includeFragile) {
-    const labelData = getScatolaLabelData(scatola);
+async function ensureJsPdfLoaded() {
+    if (window.jspdf?.jsPDF) return window.jspdf.jsPDF;
+
+    await new Promise((resolve, reject) => {
+        const existing = document.querySelector('script[data-lib="jspdf"]');
+        if (existing) {
+            existing.addEventListener('load', () => resolve(), { once: true });
+            existing.addEventListener('error', () => reject(new Error('Caricamento jsPDF fallito.')), { once: true });
+            return;
+        }
+
+        const script = document.createElement('script');
+        script.src = 'https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js';
+        script.async = true;
+        script.dataset.lib = 'jspdf';
+        script.onload = () => resolve();
+        script.onerror = () => reject(new Error('Caricamento jsPDF fallito.'));
+        document.head.appendChild(script);
+    });
+
+    if (!window.jspdf?.jsPDF) {
+        throw new Error('jsPDF non disponibile nel browser.');
+    }
+
+    return window.jspdf.jsPDF;
+}
+
+async function blobToDataUrl(blob) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result || ''));
+        reader.onerror = () => reject(new Error('Conversione immagine fallita.'));
+        reader.readAsDataURL(blob);
+    });
+}
+
+async function getObjectPhotoDataUrl(pathfoto) {
+    if (!pathfoto) return null;
+    const publicUrl = getPublicStorageUrl(pathfoto);
+    if (!publicUrl) return null;
+
+    const response = await fetch(publicUrl);
+    if (!response.ok) {
+        throw new Error(`Download foto fallito (${response.status}).`);
+    }
+
+    const blob = await response.blob();
+    if (!blob.type.startsWith('image/')) {
+        throw new Error('File foto non valido.');
+    }
+
+    return blobToDataUrl(blob);
+}
+
+function safePdfFileName(label) {
+    return String(label || 'scatola')
+        .replaceAll(/[^a-zA-Z0-9-_]+/g, '_')
+        .replaceAll(/_+/g, '_')
+        .replace(/^_+|_+$/g, '') || 'scatola';
+}
+
+function getPrintDateToken(dateValue) {
+    const date = dateValue ? new Date(dateValue.replace(' ', 'T')) : new Date();
+    if (Number.isNaN(date.getTime())) return '00000000-0000';
+    const pad = (n) => String(n).padStart(2, '0');
+    return `${date.getFullYear()}${pad(date.getMonth() + 1)}${pad(date.getDate())}-${pad(date.getHours())}${pad(date.getMinutes())}`;
+}
+
+function buildScatolaPdfFileName(scatola, printedAt) {
+    const scatolaKey = safePdfFileName(getScatolaDisplayName(scatola));
+    const stanzaKey = safePdfFileName(getScatolaLinkedStanzeLabel(scatola.id));
+    const mobileKey = safePdfFileName(getScatolaLinkedMobiliLabel(scatola.id));
+    const dateKey = getPrintDateToken(printedAt || null);
+    return `scatola-${scatolaKey}-${stanzaKey}-${mobileKey}-${dateKey}.pdf`;
+}
+
+async function generateScatolaLabelPdf(scatola, includeFragile, printedAt = null, fileNameOverride = '') {
+    const labelData = getScatolaLabelData(scatola, printedAt);
+    const jsPDF = await ensureJsPdfLoaded();
+    const doc = new jsPDF({ unit: 'mm', format: 'a4', orientation: 'portrait' });
+
+    const primaryName = labelData.primaryStanza ? labelData.primaryStanza.nome : 'Nessuna stanza collegata';
+    const primaryCount = labelData.primaryStanza ? labelData.primaryStanza.count : null;
+    const otherLabels = labelData.otherStanze.length
+        ? labelData.otherStanze.map((item) => `${item.nome} (${item.count})`).join(' - ')
+        : 'Nessuna';
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(20);
+    doc.text(`Etichetta Scatola ${labelData.scatolaNome}`, 15, 20);
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(12);
+    doc.text(`Scatola: ${labelData.scatolaNome}`, 15, 34);
+    doc.text(`Stanza principale: ${primaryName}${primaryCount !== null ? ` (${primaryCount})` : ''}`, 15, 42);
+
+    const otherLines = doc.splitTextToSize(`Altre stanze: ${otherLabels}`, 180);
+    doc.text(otherLines, 15, 50);
+
+    const afterOtherY = 50 + (otherLines.length * 6);
+    doc.text(`Quantita oggetti: ${labelData.quantitaOggetti}`, 15, afterOtherY + 4);
+    doc.text(`Data stampa: ${labelData.dataStampa}`, 15, afterOtherY + 12);
+
+    // Nel PDF includiamo anche la foto principale della scatola (se presente).
+    if (scatola?.pathfoto) {
+        let scatolaPhotoDataUrl = null;
+        try {
+            scatolaPhotoDataUrl = await getObjectPhotoDataUrl(scatola.pathfoto);
+        } catch {
+            scatolaPhotoDataUrl = null;
+        }
+
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(11);
+        doc.text('Foto scatola', 125, 30);
+        doc.setDrawColor(214, 211, 209);
+        doc.rect(125, 34, 70, 52);
+
+        if (scatolaPhotoDataUrl) {
+            try {
+                doc.addImage(scatolaPhotoDataUrl, 'JPEG', 126, 35, 68, 50, undefined, 'FAST');
+            } catch {
+                doc.setFont('helvetica', 'normal');
+                doc.setFontSize(10);
+                doc.text('Immagine non leggibile.', 128, 60);
+            }
+        } else {
+            doc.setFont('helvetica', 'normal');
+            doc.setFontSize(10);
+            doc.text('Foto non disponibile.', 128, 60);
+        }
+    }
+
+    if (includeFragile) {
+        doc.setTextColor(220, 38, 38);
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(24);
+        doc.text('FRAGILE', 15, afterOtherY + 28);
+        doc.setTextColor(0, 0, 0);
+    }
+
+    const { data: oggetti, error: oggettiError } = await supabase
+        .from('oggetti')
+        .select('id,nome,pathfoto,note')
+        .eq('idscatola', scatola.id)
+        .order('id', { ascending: true });
+
+    if (oggettiError) {
+        throw new Error(`Caricamento oggetti fallito: ${oggettiError.message}`);
+    }
+
+    const oggettiConFoto = (oggetti || []).filter((item) => item.pathfoto);
+
+    doc.addPage('a4', 'portrait');
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(16);
+    doc.text('Foto oggetti contenuti', 15, 18);
+
+    if (oggettiConFoto.length === 0) {
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(12);
+        doc.text('Nessuna foto oggetto disponibile per questa scatola.', 15, 30);
+    }
+
+    let cursorY = 26;
+    const maxW = 180;
+    const blockH = 82;
+
+    for (const oggetto of oggettiConFoto) {
+        if (cursorY + blockH > 285) {
+            doc.addPage('a4', 'portrait');
+            cursorY = 18;
+        }
+
+        let dataUrl = null;
+        try {
+            dataUrl = await getObjectPhotoDataUrl(oggetto.pathfoto);
+        } catch {
+            dataUrl = null;
+        }
+
+        doc.setDrawColor(214, 211, 209);
+        doc.rect(15, cursorY, maxW, blockH - 4);
+
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(11);
+        doc.text(`Oggetto #${oggetto.id}${oggetto.nome ? ` - ${String(oggetto.nome)}` : ''}`, 18, cursorY + 6);
+
+        if (dataUrl) {
+            try {
+                doc.addImage(dataUrl, 'JPEG', 18, cursorY + 10, 70, 56, undefined, 'FAST');
+            } catch {
+                doc.setFont('helvetica', 'normal');
+                doc.setFontSize(10);
+                doc.text('Immagine non leggibile.', 18, cursorY + 24);
+            }
+        } else {
+            doc.setFont('helvetica', 'normal');
+            doc.setFontSize(10);
+            doc.text('Foto non disponibile.', 18, cursorY + 24);
+        }
+
+        const noteValue = normalizeText(oggetto.note) || '-';
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(10);
+        const noteLines = doc.splitTextToSize(`Note: ${noteValue}`, 85);
+        doc.text(noteLines, 95, cursorY + 14);
+
+        cursorY += blockH;
+    }
+
+    const safeName = safePdfFileName(labelData.scatolaNome);
+    const fileName = fileNameOverride || `etichetta-scatola-${safeName}.pdf`;
+    const pdfBlob = doc.output('blob');
+    return { fileName, pdfBlob };
+}
+
+function printScatolaLabelA5(scatola, includeFragile, printedAt = null) {
+    const labelData = getScatolaLabelData(scatola, printedAt);
     const printWindow = window.open('', '_blank', 'width=900,height=700');
         if (!printWindow) {
                 showServiziMsg('Popup bloccato: consenti le finestre per stampare l\'etichetta.', 'err');
@@ -1206,13 +1483,13 @@ function printScatolaLabelA5(scatola, includeFragile) {
     <meta charset="utf-8">
     <title>Etichetta Scatola ${escapeHtml(labelData.scatolaNome)}</title>
     <style>
-        @page { size: A5 portrait; margin: 8mm; }
+        @page { size: A4 portrait; margin: 10mm; }
         html, body { margin: 0; padding: 0; font-family: Arial, sans-serif; }
         body { width: 100%; }
         .top-actions { display: flex; justify-content: flex-end; gap: 8px; padding: 8px; }
         .top-actions button { border: 1px solid #d6d3d1; border-radius: 8px; padding: 7px 12px; cursor: pointer; font-weight: 700; background: #fff; }
         .top-actions .primary { background: #0f766e; color: #fff; border-color: #0f766e; }
-        .label { padding: 14px; min-height: calc(210mm - 16mm); box-sizing: border-box; }
+        .label { padding: 14px; min-height: 138mm; max-height: 138mm; box-sizing: border-box; border: 1px dashed #d6d3d1; overflow: hidden; }
         .top-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; align-items: start; }
         .top-grid > div { min-width: 0; }
         .row-first { margin-bottom: 18px; }
@@ -1226,8 +1503,8 @@ function printScatolaLabelA5(scatola, includeFragile) {
         .fragile { margin-top: 14px; font-size: 38px; font-weight: 900; color: #dc2626; border: 3px solid #dc2626; border-radius: 8px; text-align: center; padding: 8px; }
         @media print {
             .screen-only { display: none !important; }
-            html, body { width: 148mm; height: 210mm; }
-            .label { min-height: calc(210mm - 16mm); }
+            html, body { width: 210mm; height: 297mm; }
+            .label { min-height: 138mm; max-height: 138mm; }
         }
     </style>
 </head>
@@ -1257,6 +1534,10 @@ function printScatolaLabelA5(scatola, includeFragile) {
         <section class="row">
             <div class="title">Quantita oggetti</div>
             <div class="qty">${labelData.quantitaOggetti}</div>
+        </section>
+        <section class="row">
+            <div class="title">Data stampa</div>
+            <div class="value-small">${escapeHtml(labelData.dataStampa)}</div>
         </section>
         ${includeFragile ? '<section class="fragile">FRAGILE</section>' : ''}
     </article>
@@ -1300,11 +1581,19 @@ async function initServizi(mode = 'stanze') {
     const scatolaMobile = document.getElementById('scatolaMobile');
     const filterScatolaNome = document.getElementById('filterScatolaNome');
     const filterScatolaStanza = document.getElementById('filterScatolaStanza');
+    const filterScatolaStampa = document.getElementById('filterScatolaStampa');
+    const filterScatolaStato = document.getElementById('filterScatolaStato');
     const scatolaNomeField = document.getElementById('scatolaNomeField');
     const scatolaNomeInput = document.getElementById('scatolaNome');
     const scatolaFotoFile = document.getElementById('scatolaFotoFile');
     const btnScatolaFoto = document.getElementById('btnScatolaFoto');
     const btnRimuoviScatolaFoto = document.getElementById('btnRimuoviScatolaFoto');
+    const scatolaQuickActions = document.getElementById('scatolaQuickActions');
+    const scatolaStatusHint = document.getElementById('scatolaStatusHint');
+    const btnScatolaCmdPrint = document.getElementById('btnScatolaCmdPrint');
+    const btnScatolaCmdFoto = document.getElementById('btnScatolaCmdFoto');
+    const btnScatolaCmdToggleStato = document.getElementById('btnScatolaCmdToggleStato');
+    const btnScatolaCmdDelete = document.getElementById('btnScatolaCmdDelete');
     const modalTitleScatole = document.getElementById('modalTitleScatole');
     const submitScatola = document.getElementById('submitScatola');
 
@@ -1507,13 +1796,21 @@ async function initServizi(mode = 'stanze') {
                 const matchesNome = !serviziState.filters.scatolaNome || getScatolaDisplayName(scatola) === serviziState.filters.scatolaNome;
                 if (!matchesNome) return false;
 
-                if (!serviziState.filters.stanza) return true;
-                const stanzaMap = serviziState.stanzaCountByScatola.get(String(scatola.id)) || new Map();
-                return stanzaMap.has(serviziState.filters.stanza);
+                if (serviziState.filters.stanza) {
+                    const stanzaMap = serviziState.stanzaCountByScatola.get(String(scatola.id)) || new Map();
+                    if (!stanzaMap.has(serviziState.filters.stanza)) return false;
+                }
+
+                if (serviziState.filters.stampaStatus === 'printed' && !scatola.data) return false;
+                if (serviziState.filters.stampaStatus === 'pending' && scatola.data) return false;
+
+                if (serviziState.filters.scatolaStato === 'closed' && !isScatolaClosed(scatola)) return false;
+                if (serviziState.filters.scatolaStato === 'open' && isScatolaClosed(scatola)) return false;
+                return true;
             });
 
             if (filteredScatole.length === 0) {
-                tbScatole.innerHTML = '<tr><td colspan="5">Nessuna scatola trovata con i filtri selezionati.</td></tr>';
+                tbScatole.innerHTML = '<tr><td colspan="7">Nessuna scatola trovata con i filtri selezionati.</td></tr>';
                 return;
             }
 
@@ -1523,11 +1820,10 @@ async function initServizi(mode = 'stanze') {
                     <td>${escapeHtml(getScatolaLinkedStanzeLabel(s.id))}</td>
                     <td>${escapeHtml(getScatolaLinkedMobiliLabel(s.id))}</td>
                     <td>${serviziState.oggettiCountByScatola.get(String(s.id)) || 0}</td>
+                    <td>${escapeHtml(formatPrintDate(s.data))}</td>
+                    <td class="stato-cell"><span class="stato-dot ${isScatolaClosed(s) ? 'is-closed' : 'is-open'}" aria-hidden="true"></span>${isScatolaClosed(s) ? 'Chiusa' : 'Aperta'}</td>
                     <td>
-                        <button class="mini-btn" data-action="print-scatola-label" data-id="${s.id}">Etichetta PDF</button>
-                        <button class="mini-btn" data-action="view-scatola-foto" data-id="${s.id}">Foto</button>
-                        <button class="mini-btn" data-action="edit-scatola" data-id="${s.id}">Modifica</button>
-                        <button class="mini-btn" data-action="delete-scatola" data-id="${s.id}">Elimina</button>
+                        <button class="mini-btn" data-action="edit-scatola" data-id="${s.id}">Visualizza</button>
                     </td>
                 </tr>
             `).join('');
@@ -1577,6 +1873,24 @@ async function initServizi(mode = 'stanze') {
                 filterScatolaStanza.value = '';
                 serviziState.filters.stanza = '';
             }
+        }
+
+        if (filterScatolaStampa) {
+            const allowed = new Set(['', 'printed', 'pending']);
+            const oldValue = allowed.has(serviziState.filters.stampaStatus)
+                ? serviziState.filters.stampaStatus
+                : '';
+            filterScatolaStampa.value = oldValue;
+            serviziState.filters.stampaStatus = oldValue;
+        }
+
+        if (filterScatolaStato) {
+            const allowed = new Set(['', 'open', 'closed']);
+            const oldValue = allowed.has(serviziState.filters.scatolaStato)
+                ? serviziState.filters.scatolaStato
+                : '';
+            filterScatolaStato.value = oldValue;
+            serviziState.filters.scatolaStato = oldValue;
         }
     };
 
@@ -1768,10 +2082,60 @@ async function initServizi(mode = 'stanze') {
         if (submitScatola) submitScatola.textContent = isEdit ? 'Aggiorna' : 'Salva';
         if (resetScatola) resetScatola.textContent = isEdit ? 'Annulla Modifica' : 'Annulla';
         if (scatolaNomeField) scatolaNomeField.style.display = isEdit ? '' : 'none';
+        if (scatolaQuickActions) scatolaQuickActions.style.display = isEdit ? 'flex' : 'none';
+        if (scatolaStatusHint) {
+            scatolaStatusHint.style.display = isEdit ? '' : 'none';
+            if (!isEdit) scatolaStatusHint.textContent = '';
+        }
         if (scatolaNomeInput) {
             scatolaNomeInput.readOnly = !isEdit;
             scatolaNomeInput.placeholder = isEdit ? 'Nome scatola' : '';
             if (!isEdit) scatolaNomeInput.value = '';
+        }
+    };
+
+    const bindScatolaPopupActions = (scatola) => {
+        const targetId = String(scatola?.id || '');
+        [btnScatolaCmdPrint, btnScatolaCmdFoto, btnScatolaCmdToggleStato, btnScatolaCmdDelete].forEach((btn) => {
+            if (!btn) return;
+            btn.dataset.id = targetId;
+        });
+
+        const isClosed = isScatolaClosed(scatola);
+        const linkedOggettiCount = serviziState.oggettiCountByScatola.get(targetId) || 0;
+        const hasPrintedLabel = Boolean(scatola?.data);
+
+        // Scatola chiusa: popup in sola lettura, resta disponibile solo la stampa etichetta.
+        if (scatolaNomeInput) scatolaNomeInput.readOnly = isClosed;
+        if (scatolaNomeInput) scatolaNomeInput.disabled = isClosed;
+        if (scatolaFotoFile) scatolaFotoFile.disabled = isClosed;
+        if (btnScatolaFoto) btnScatolaFoto.style.display = isClosed ? 'none' : '';
+        if (btnRimuoviScatolaFoto) btnRimuoviScatolaFoto.style.display = isClosed ? 'none' : '';
+        const scatolaNoteInput = document.getElementById('scatolaNote');
+        if (scatolaNoteInput) scatolaNoteInput.readOnly = isClosed;
+        if (submitScatola) submitScatola.style.display = isClosed ? 'none' : '';
+        if (resetScatola) resetScatola.textContent = isClosed ? 'Chiudi' : 'Annulla Modifica';
+
+        if (btnScatolaCmdDelete) {
+            btnScatolaCmdDelete.style.display = (isClosed || linkedOggettiCount > 0) ? 'none' : '';
+        }
+
+        if (btnScatolaCmdToggleStato) {
+            btnScatolaCmdToggleStato.textContent = isScatolaClosed(scatola) ? 'Riapri Scatola' : 'Chiudi Scatola';
+            btnScatolaCmdToggleStato.style.display = '';
+        }
+
+        if (btnScatolaCmdFoto) btnScatolaCmdFoto.style.display = isClosed ? 'none' : '';
+        if (btnScatolaCmdPrint) btnScatolaCmdPrint.style.display = '';
+
+        if (scatolaStatusHint) {
+            const canDeleteText = linkedOggettiCount > 0
+                ? ' Elimina non disponibile: scatola con oggetti collegati.'
+                : ' Elimina disponibile: nessun oggetto collegato.';
+            const closedLockText = isClosed
+                ? ' Scatola chiusa: modifiche disabilitate, disponibile solo stampa etichetta.'
+                : '';
+            scatolaStatusHint.textContent = `Stato attuale scatola: ${isScatolaClosed(scatola) ? 'Chiusa' : 'Aperta'}.${canDeleteText}${closedLockText}`;
         }
     };
 
@@ -1791,6 +2155,7 @@ async function initServizi(mode = 'stanze') {
         document.getElementById('scatolaStanza').value = getScatolaLinkedStanzeLabel(scatola.id);
         document.getElementById('scatolaMobile').value = getScatolaLinkedMobiliLabel(scatola.id);
         document.getElementById('scatolaNote').value = scatola.note || '';
+        bindScatolaPopupActions(scatola);
 
         serviziState.scatolaFotoFile = null;
         serviziState.scatolaFotoRemoved = false;
@@ -1810,11 +2175,12 @@ async function initServizi(mode = 'stanze') {
         }
 
         openModal('scatole');
+        const scatolaRef = getScatolaDisplayName(scatola);
         if (fotoMode) {
-            showServiziMsg(`Gestione foto scatola #${scatola.id}: acquisisci/carica o rimuovi.`, 'ok');
+            showServiziMsg(`Gestione foto scatola ${scatolaRef}: acquisisci/carica o rimuovi.`, 'ok');
             document.getElementById('btnScatolaFoto')?.scrollIntoView({ block: 'center', behavior: 'smooth' });
         } else {
-            showServiziMsg(`Modifica scatola #${scatola.id}`, 'ok');
+            showServiziMsg(`Modifica scatola ${scatolaRef}`, 'ok');
         }
 
         return scatola;
@@ -2112,15 +2478,78 @@ async function initServizi(mode = 'stanze') {
             return;
         }
 
-        if (action === 'view-scatola-foto') {
-            openScatolaEditor(id, { fotoMode: true });
+        if (action === 'focus-scatola-foto') {
+            document.getElementById('btnScatolaFoto')?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+            showServiziMsg('Sezione foto evidenziata nel popup.', 'ok');
             return;
         }
+        if (action === 'toggle-scatola-stato') {
+            const scatola = serviziState.scatole.find(s => String(s.id) === String(id));
+            if (!scatola) {
+                showServiziMsg('Scatola non trovata per aggiornamento stato.', 'err');
+                return;
+            }
+            const scatolaRef = getScatolaDisplayName(scatola);
+
+            const nextState = !isScatolaClosed(scatola);
+            const nextLabel = nextState ? 'chiusa' : 'aperta';
+            const ok = window.confirm(`Confermi impostazione scatola ${scatolaRef} come ${nextLabel}?`);
+            if (!ok) return;
+
+            let printedAt = scatola.data || null;
+            if (nextState) {
+                printedAt = getLocalPgTimestamp(new Date());
+                if (!printedAt) {
+                    showServiziMsg('Data stampa non valida.', 'err');
+                    return;
+                }
+
+                const fileName = buildScatolaPdfFileName(scatola, printedAt);
+
+                let pdfResult = null;
+                try {
+                    showServiziMsg(`Generazione PDF per chiusura scatola ${scatolaRef}...`, 'ok');
+                    pdfResult = await generateScatolaLabelPdf(scatola, false, printedAt, fileName);
+                    await uploadOrReplacePdfInDrive(pdfResult.fileName, pdfResult.pdfBlob, getScatolaDisplayName(scatola));
+                } catch (error) {
+                    showServiziMsg(`Chiusura annullata: PDF non salvato (${error.message || String(error)}).`, 'err');
+                    return;
+                }
+            }
+
+            const updateRes = await supabase
+                .from('scatole')
+                .update({
+                    stato: nextState,
+                    ...(nextState ? { data: printedAt } : {}),
+                })
+                .eq('id', scatola.id);
+
+            if (updateRes.error) {
+                showServiziMsg(`Aggiornamento stato fallito: ${updateRes.error.message}`, 'err');
+                return;
+            }
+
+            scatola.stato = nextState;
+            if (nextState && printedAt) scatola.data = printedAt;
+            bindScatolaPopupActions(scatola);
+            renderServiziTables();
+            showServiziMsg(`Scatola ${scatolaRef} aggiornata: ${nextState ? 'Chiusa' : 'Aperta'}.${nextState ? ' PDF archiviato su Drive.' : ''}`, 'ok');
+            return;
+        }
+
 
         if (action === 'print-scatola-label') {
             const scatola = serviziState.scatole.find(s => String(s.id) === String(id));
             if (!scatola) {
                 showServiziMsg('Scatola non trovata per la stampa etichetta.', 'err');
+                return;
+            }
+            const scatolaRef = getScatolaDisplayName(scatola);
+
+            const confirmPrint = window.confirm(`Confermi la stampa etichetta per la scatola ${scatolaRef}?`);
+            if (!confirmPrint) {
+                showServiziMsg('Operazione annullata.', 'ok');
                 return;
             }
 
@@ -2129,8 +2558,32 @@ async function initServizi(mode = 'stanze') {
                 showServiziMsg('Stampa etichetta annullata.', 'ok');
                 return;
             }
-            printScatolaLabelA5(scatola, includeFragile);
-            showServiziMsg(`Aperta etichetta A5 per scatola #${scatola.id}. Usa il bottone Stampa nella pannellata.`, 'ok');
+
+            let printedAt = scatola.data || null;
+            if (!printedAt) {
+                printedAt = getLocalPgTimestamp(new Date());
+                if (!printedAt) {
+                    showServiziMsg('Data stampa non valida.', 'err');
+                    return;
+                }
+
+                const updatePrintDateRes = await supabase
+                    .from('scatole')
+                    .update({ data: printedAt })
+                    .eq('id', scatola.id);
+
+                if (updatePrintDateRes.error) {
+                    showServiziMsg(`Aggiornamento data stampa fallito: ${updatePrintDateRes.error.message}`, 'err');
+                    return;
+                }
+
+                scatola.data = printedAt;
+                bindScatolaPopupActions(scatola);
+                renderServiziTables();
+            }
+
+            printScatolaLabelA5(scatola, includeFragile, printedAt);
+            showServiziMsg(`Aperta anteprima A5 per scatola ${scatolaRef}. Il PDF su Drive viene generato alla chiusura scatola.`, 'ok');
             return;
         }
 
@@ -2138,26 +2591,6 @@ async function initServizi(mode = 'stanze') {
         if (action === 'delete-mobile') await deleteMobileWithChecks(id);
         if (action === 'delete-scatola') await deleteScatolaWithChecks(id);
     });
-
-    if (isScatoleMode) {
-        panel?.addEventListener('dblclick', (event) => {
-            const targetEl = event.target;
-            if (!(targetEl instanceof Element)) return;
-            if (targetEl.closest('button, a, input, select, textarea, label')) return;
-
-            const row = targetEl.closest('#tbScatole tr[data-scatola-id]');
-            if (!row) return;
-
-            const scatolaId = row.getAttribute('data-scatola-id') || '';
-            const scatola = serviziState.scatole.find((item) => String(item.id) === String(scatolaId));
-            if (!scatola) return;
-
-            setGestionePrefill({
-                scatola: getScatolaDisplayName(scatola),
-            });
-            caricaPannello('gestione');
-        });
-    }
 
     if (btnExpandMobiliTree) {
         btnExpandMobiliTree.onclick = () => {
@@ -2243,6 +2676,20 @@ async function initServizi(mode = 'stanze') {
     if (filterScatolaStanza) {
         filterScatolaStanza.onchange = () => {
             serviziState.filters.stanza = filterScatolaStanza.value || '';
+            renderServiziTables();
+        };
+    }
+
+    if (filterScatolaStampa) {
+        filterScatolaStampa.onchange = () => {
+            serviziState.filters.stampaStatus = filterScatolaStampa.value || '';
+            renderServiziTables();
+        };
+    }
+
+    if (filterScatolaStato) {
+        filterScatolaStato.onchange = () => {
+            serviziState.filters.scatolaStato = filterScatolaStato.value || '';
             renderServiziTables();
         };
     }
@@ -2893,6 +3340,102 @@ async function driveFetchJson(url, options = {}) {
 
     if (response.status === 204) return null;
     return response.json();
+}
+
+function escapeDriveQueryValue(value) {
+    return String(value || '')
+        .replaceAll('\\', '\\\\')
+        .replaceAll("'", "\\'");
+}
+
+async function listDriveFilesByNameInFolder(folderId, fileName, mimeType = '') {
+    const queryParts = [
+        `'${folderId}' in parents`,
+        'trashed=false',
+        `name='${escapeDriveQueryValue(fileName)}'`,
+    ];
+
+    if (mimeType) queryParts.push(`mimeType='${escapeDriveQueryValue(mimeType)}'`);
+
+    const q = encodeURIComponent(queryParts.join(' and '));
+    const fields = encodeURIComponent('files(id,name,webViewLink,createdTime)');
+    const result = await driveFetchJson(`https://www.googleapis.com/drive/v3/files?q=${q}&fields=${fields}&pageSize=50`);
+    return Array.isArray(result?.files) ? result.files : [];
+}
+
+async function listDriveFilesByNamePrefixInFolder(folderId, namePrefix, mimeType = '') {
+    const queryParts = [
+        `'${folderId}' in parents`,
+        'trashed=false',
+        `name contains '${escapeDriveQueryValue(namePrefix)}'`,
+    ];
+
+    if (mimeType) queryParts.push(`mimeType='${escapeDriveQueryValue(mimeType)}'`);
+
+    const q = encodeURIComponent(queryParts.join(' and '));
+    const fields = encodeURIComponent('files(id,name,webViewLink,createdTime)');
+    const result = await driveFetchJson(`https://www.googleapis.com/drive/v3/files?q=${q}&fields=${fields}&pageSize=50`);
+    return Array.isArray(result?.files) ? result.files : [];
+}
+
+async function uploadOrReplacePdfInDrive(fileName, pdfBlob, boxNumberKey = '') {
+    const normalizedBoxKey = safePdfFileName(boxNumberKey || 'scatola');
+    const boxPrefix = `scatola-${normalizedBoxKey}-`;
+    const existing = await listDriveFilesByNamePrefixInFolder(DRIVE_LABELS_FOLDER_ID, boxPrefix, 'application/pdf');
+
+    if (existing.length > 0) {
+        const target = existing[0];
+        const file = await driveFetchJson(`https://www.googleapis.com/upload/drive/v3/files/${encodeURIComponent(target.id)}?uploadType=media&fields=id,name,webViewLink`, {
+            method: 'PATCH',
+            headers: {
+                'Content-Type': 'application/pdf',
+            },
+            body: pdfBlob,
+        });
+
+        for (const duplicate of existing.slice(1)) {
+            await driveFetchJson(`https://www.googleapis.com/drive/v3/files/${encodeURIComponent(duplicate.id)}`, {
+                method: 'DELETE',
+            });
+        }
+
+        return {
+            mode: 'replaced',
+            file,
+            duplicatesDeleted: Math.max(0, existing.length - 1),
+        };
+    }
+
+    const metadata = {
+        name: fileName,
+        parents: [DRIVE_LABELS_FOLDER_ID],
+        mimeType: 'application/pdf',
+    };
+
+    const boundary = `trasloco_pdf_${Date.now()}`;
+    const multipartBody = new Blob([
+        `--${boundary}\r\n`,
+        'Content-Type: application/json; charset=UTF-8\r\n\r\n',
+        `${JSON.stringify(metadata)}\r\n`,
+        `--${boundary}\r\n`,
+        'Content-Type: application/pdf\r\n\r\n',
+        pdfBlob,
+        `\r\n--${boundary}--`,
+    ], { type: `multipart/related; boundary=${boundary}` });
+
+    const file = await driveFetchJson('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name,webViewLink', {
+        method: 'POST',
+        headers: {
+            'Content-Type': `multipart/related; boundary=${boundary}`,
+        },
+        body: multipartBody,
+    });
+
+    return {
+        mode: 'created',
+        file,
+        duplicatesDeleted: 0,
+    };
 }
 
 async function uploadBackupToDrive(backupPayload) {
