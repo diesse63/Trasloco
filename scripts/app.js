@@ -1238,8 +1238,13 @@ function getScatolaLabelData(scatola, printedAt = null) {
         };
 }
 
+function normalizeLabelSecondLine(value) {
+    return String(value || '').trim();
+}
+
 function askFragileLabelChoice() {
     return new Promise((resolve) => {
+        const secondLineOptions = ['Bicchieri', 'Soprammobili', 'Piatti', 'Bottiglie'];
         const overlay = document.createElement('div');
         overlay.style.position = 'fixed';
         overlay.style.inset = '0';
@@ -1264,6 +1269,34 @@ function askFragileLabelChoice() {
         const msg = document.createElement('p');
         msg.textContent = 'Apporre la scritta FRAGILE in rosso sull\'etichetta?';
         msg.style.margin = '0 0 12px';
+
+        const secondLineWrap = document.createElement('label');
+        secondLineWrap.style.display = 'block';
+        secondLineWrap.style.margin = '0 0 12px';
+        secondLineWrap.style.fontSize = '13px';
+        secondLineWrap.style.color = '#44403c';
+        secondLineWrap.textContent = 'Secondo rigo (opzionale)';
+
+        const secondLineInput = document.createElement('input');
+        secondLineInput.type = 'text';
+        secondLineInput.placeholder = 'Es. Bicchieri';
+        secondLineInput.setAttribute('list', 'fragileSecondLineOptions');
+        secondLineInput.style.marginTop = '6px';
+        secondLineInput.style.width = '100%';
+        secondLineInput.style.boxSizing = 'border-box';
+        secondLineInput.style.padding = '7px 8px';
+        secondLineInput.style.borderRadius = '8px';
+        secondLineInput.style.border = '1px solid #d6d3d1';
+
+        const secondLineDatalist = document.createElement('datalist');
+        secondLineDatalist.id = 'fragileSecondLineOptions';
+        secondLineOptions.forEach((item) => {
+            const option = document.createElement('option');
+            option.value = item;
+            secondLineDatalist.appendChild(option);
+        });
+
+        secondLineWrap.append(secondLineInput, secondLineDatalist);
 
         const actions = document.createElement('div');
         actions.style.display = 'flex';
@@ -1293,17 +1326,23 @@ function askFragileLabelChoice() {
             resolve(result);
         };
 
+        const getPayload = (includeFragile) => ({
+            includeFragile,
+            secondLine: normalizeLabelSecondLine(secondLineInput.value),
+        });
+
         btnAnnulla.onclick = () => cleanup(null);
-        btnNo.onclick = () => cleanup(false);
-        btnSi.onclick = () => cleanup(true);
+        btnNo.onclick = () => cleanup(getPayload(false));
+        btnSi.onclick = () => cleanup(getPayload(true));
         overlay.onclick = (event) => {
             if (event.target === overlay) cleanup(null);
         };
 
         actions.append(btnAnnulla, btnNo, btnSi);
-        box.append(title, msg, actions);
+        box.append(title, msg, secondLineWrap, actions);
         overlay.appendChild(box);
         document.body.appendChild(overlay);
+        secondLineInput.focus();
     });
 }
 
@@ -1383,8 +1422,9 @@ function buildScatolaPdfFileName(scatola, printedAt) {
     return `scatola-${scatolaKey}-${stanzaKey}-${mobileKey}-${dateKey}.pdf`;
 }
 
-async function generateScatolaLabelPdf(scatola, includeFragile, printedAt = null, fileNameOverride = '') {
+async function generateScatolaLabelPdf(scatola, includeFragile, printedAt = null, fileNameOverride = '', secondLine = '') {
     const labelData = getScatolaLabelData(scatola, printedAt);
+    const labelSecondLine = normalizeLabelSecondLine(secondLine);
     const jsPDF = await ensureJsPdfLoaded();
     const doc = new jsPDF({ unit: 'mm', format: 'a4', orientation: 'portrait' });
 
@@ -1446,6 +1486,13 @@ async function generateScatolaLabelPdf(scatola, includeFragile, printedAt = null
         doc.setFontSize(24);
         doc.text('FRAGILE', 15, afterOtherY + 28);
         doc.setTextColor(0, 0, 0);
+    }
+
+    if (labelSecondLine) {
+        const secondLineY = includeFragile ? afterOtherY + 40 : afterOtherY + 28;
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(16);
+        doc.text(labelSecondLine, 15, secondLineY);
     }
 
     const { data: oggetti, error: oggettiError } = await supabase
@@ -1524,8 +1571,9 @@ async function generateScatolaLabelPdf(scatola, includeFragile, printedAt = null
     return { fileName, pdfBlob };
 }
 
-function printScatolaLabelA5(scatola, includeFragile, printedAt = null) {
+function printScatolaLabelA5(scatola, includeFragile, printedAt = null, secondLine = '') {
     const labelData = getScatolaLabelData(scatola, printedAt);
+    const labelSecondLine = normalizeLabelSecondLine(secondLine);
     const printWindow = window.open('', '_blank', 'width=900,height=700');
         if (!printWindow) {
                 showServiziMsg('Popup bloccato: consenti le finestre per stampare l\'etichetta.', 'err');
@@ -1565,6 +1613,7 @@ function printScatolaLabelA5(scatola, includeFragile, printedAt = null) {
         .value-small { font-size: 16px; color: #374151; }
         .qty { font-size: 28px; font-weight: 800; }
         .fragile { margin-top: 14px; font-size: 38px; font-weight: 900; color: #dc2626; border: 3px solid #dc2626; border-radius: 8px; text-align: center; padding: 8px; }
+        .secondary-line { margin-top: 12px; font-size: 24px; font-weight: 800; color: #111827; border: 2px solid #111827; border-radius: 8px; text-align: center; padding: 7px 8px; }
         @media print {
             .screen-only { display: none !important; }
             html, body { width: 210mm; height: 297mm; }
@@ -1604,6 +1653,7 @@ function printScatolaLabelA5(scatola, includeFragile, printedAt = null) {
             <div class="value-small">${escapeHtml(labelData.dataStampa)}</div>
         </section>
         ${includeFragile ? '<section class="fragile">FRAGILE</section>' : ''}
+        ${labelSecondLine ? `<section class="secondary-line">${escapeHtml(labelSecondLine)}</section>` : ''}
     </article>
 </body>
 </html>`;
@@ -2617,8 +2667,8 @@ async function initServizi(mode = 'stanze') {
                 return;
             }
 
-            const includeFragile = await askFragileLabelChoice();
-            if (includeFragile === null) {
+            const labelChoices = await askFragileLabelChoice();
+            if (labelChoices === null) {
                 showServiziMsg('Stampa etichetta annullata.', 'ok');
                 return;
             }
@@ -2646,7 +2696,7 @@ async function initServizi(mode = 'stanze') {
                 renderServiziTables();
             }
 
-            printScatolaLabelA5(scatola, includeFragile, printedAt);
+            printScatolaLabelA5(scatola, labelChoices.includeFragile, printedAt, labelChoices.secondLine);
             showServiziMsg(`Aperta anteprima A5 per scatola ${scatolaRef}. Il PDF su Drive viene generato alla chiusura scatola.`, 'ok');
             return;
         }
