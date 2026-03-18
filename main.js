@@ -229,8 +229,8 @@ app.get('/', (_req, res) => {
     res.sendFile(path.join(__dirname, 'index.html'));
 });
 
-app.listen(3000, () => {
-    console.log('App Trasloco in esecuzione su http://localhost:3000');
+app.listen(4000, () => {
+    console.log('App Trasloco in esecuzione su http://localhost:4000');
     if (!supabase) {
         console.warn('Supabase non configurato: crea .env con SUPABASE_URL e SUPABASE_SERVICE_ROLE_KEY (o SUPABASE_ANON_KEY).');
     }

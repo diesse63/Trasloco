@@ -181,6 +181,7 @@ function initNetworkBadge() {
 
 // --- LOGICA INSERIMENTO ---
 async function initInserimento() {
+    // DICHIARAZIONE VARIABILI (PRIMA DI OGNI USO)
     const stepNodes = Array.from(document.querySelectorAll('[data-step]'));
     const stepDots = Array.from(document.querySelectorAll('[data-step-dot]'));
     const btnPrevStep = document.getElementById('btnPrevStep');
@@ -210,6 +211,39 @@ async function initInserimento() {
     const btnNewAcquisition = document.getElementById('btnNewAcquisition');
     const btnDeleteAcquisition = document.getElementById('btnDeleteAcquisition');
     const LAST_SCATOLA_BY_STANZA_KEY = 'trasloco.lastScatolaByStanza';
+
+    // Navigazione libera tra i dot
+    stepDots.forEach((dot, idx) => {
+        dot.style.cursor = 'pointer';
+        dot.addEventListener('click', () => {
+            goToStep(idx + 1);
+        });
+    });
+
+    // Cambia stato dot 1 quando acquisisci foto
+    if (inputFoto && stepDots[0]) {
+        inputFoto.addEventListener('change', () => {
+            if (inputFoto.files && inputFoto.files[0]) {
+                stepDots[0].classList.add('is-complete');
+            } else {
+                stepDots[0].classList.remove('is-complete');
+            }
+            renderWizardStep();
+        });
+    }
+
+    // Cambia stato dot 4 quando abbandoni il campo descrizione
+    const inputDescrizione = document.getElementById('nomeOggetto');
+    if (inputDescrizione && stepDots[3]) {
+        inputDescrizione.addEventListener('blur', () => {
+            if (inputDescrizione.value.trim()) {
+                stepDots[3].classList.add('is-complete');
+            } else {
+                stepDots[3].classList.remove('is-complete');
+            }
+            renderWizardStep();
+        });
+    }
 
     let imageApproved = false;
     let currentStep = 1;
@@ -252,10 +286,16 @@ async function initInserimento() {
             node.classList.toggle('is-active', isActive);
         });
 
-        stepDots.forEach((dot) => {
-            const step = Number(dot.dataset.stepDot);
-            dot.classList.toggle('is-active', step === currentStep);
-            dot.classList.toggle('is-complete', step < currentStep);
+        // Colorazione dot in base ai dati inseriti
+        const stepComplete = [
+            !!inputFoto?.files?.[0],
+            !!selStanza?.value,
+            !!selScatola?.value,
+            !!inputDescrizione?.value?.trim()
+        ];
+        stepDots.forEach((dot, idx) => {
+            dot.classList.toggle('is-active', idx + 1 === currentStep);
+            dot.classList.toggle('is-complete', stepComplete[idx]);
         });
 
         if (btnPrevStep) btnPrevStep.disabled = currentStep === 1;
