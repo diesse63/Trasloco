@@ -727,6 +727,7 @@ async function initGestione() {
     const filterScatola = document.getElementById('filterGestioneScatola');
     const filterStanza = document.getElementById('filterGestioneStanza');
     const filterMobile = document.getElementById('filterGestioneMobile');
+    const btnResetFilters = document.getElementById('btnGestioneResetFilters');
     const btnEditSelected = document.getElementById('btnGestioneEditSelected');
     const btnDeleteSelected = document.getElementById('btnGestioneDeleteSelected');
     const modalOverlay = document.getElementById('gestioneModalOverlay');
@@ -1031,6 +1032,19 @@ async function initGestione() {
         populateFilters();
         render();
     };
+
+    if (btnResetFilters) {
+        btnResetFilters.onclick = () => {
+            gestioneState.filters.term = '';
+            gestioneState.filters.scatola = '';
+            gestioneState.filters.stanza = '';
+            gestioneState.filters.mobile = '';
+            gestioneState.selectedRowId = null;
+            searchInp.value = '';
+            populateFilters();
+            render();
+        };
+    }
 
     const deleteRowById = async (row) => {
         if (!row) return;

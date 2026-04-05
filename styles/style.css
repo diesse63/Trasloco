@@ -184,6 +184,22 @@ textarea { width: 100%; padding: 12px; border: 1px solid #cbd5e1; border-radius:
 	color: #64748b;
 }
 
+.gestione-filter-actions {
+	display: flex;
+	justify-content: flex-end;
+	margin: 0 0 10px;
+}
+
+.gestione-filter-actions button {
+	border: 1px solid #cbd5e1;
+	border-radius: 8px;
+	background: #fff;
+	padding: 7px 10px;
+	cursor: pointer;
+	font-weight: 700;
+	color: #334155;
+}
+
 .gestione-selection-actions {
 	display: flex;
 	gap: 8px;
@@ -347,6 +363,14 @@ body.gestione-photo-viewer-open {
 @media (max-width: 640px) {
 	.gestione-filters {
 		grid-template-columns: 1fr;
+	}
+
+	.gestione-filter-actions {
+		justify-content: stretch;
+	}
+
+	.gestione-filter-actions button {
+		width: 100%;
 	}
 
 	.gestione-photo-viewer {
