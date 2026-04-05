@@ -22,7 +22,7 @@
                 </select>
             </label>
         </div>
-        <p class="gestione-help">Click su un'immagine: selezione + filtro scatola. Usa i pulsanti per modificare/eliminare.</p>
+        <p class="gestione-help">Click su un'immagine: apertura foto a schermo intero + selezione/filtro scatola. Usa i pulsanti per modificare/eliminare.</p>
         <div class="gestione-selection-actions">
             <button id="btnGestioneEditSelected" type="button" disabled>Modifica selezionata</button>
             <button id="btnGestioneDeleteSelected" type="button" class="danger" disabled>Elimina selezionata</button>
@@ -30,6 +30,11 @@
     </div>
     <div id="grigliaOggetti" class="search-grid">
         <!-- Risultati -->
+    </div>
+
+    <div id="gestionePhotoViewer" class="gestione-photo-viewer" hidden>
+        <button id="gestionePhotoViewerClose" type="button" class="gestione-photo-viewer-close" aria-label="Chiudi foto">Chiudi</button>
+        <img id="gestionePhotoViewerImg" alt="Foto oggetto ingrandita">
     </div>
 
     <div id="gestioneModalOverlay" class="gestione-modal-overlay" hidden>

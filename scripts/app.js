@@ -741,6 +741,9 @@ async function initGestione() {
     const editNote = document.getElementById('gestioneOggettoNote');
     const previewImg = document.getElementById('gestionePreviewImg');
     const previewMeta = document.getElementById('gestionePreviewMeta');
+    const photoViewer = document.getElementById('gestionePhotoViewer');
+    const photoViewerImg = document.getElementById('gestionePhotoViewerImg');
+    const photoViewerCloseBtn = document.getElementById('gestionePhotoViewerClose');
     const editSubmitBtn = editForm?.querySelector('button[type="submit"]');
 
     if (!searchInp || !griglia || !filterScatola || !filterStanza || !filterMobile || !modalOverlay || !editForm || !btnEditSelected || !btnDeleteSelected) return;
@@ -769,6 +772,22 @@ async function initGestione() {
             previewImg.hidden = true;
         }
         if (previewMeta) previewMeta.textContent = '';
+    };
+
+    const closePhotoViewer = () => {
+        if (!photoViewer || !photoViewerImg) return;
+        photoViewer.hidden = true;
+        photoViewerImg.src = '';
+        photoViewerImg.alt = 'Foto oggetto ingrandita';
+        document.body.classList.remove('gestione-photo-viewer-open');
+    };
+
+    const openPhotoViewer = (row) => {
+        if (!row?.oggetto_foto || !photoViewer || !photoViewerImg) return;
+        photoViewerImg.src = getPublicStorageUrl(row.oggetto_foto);
+        photoViewerImg.alt = row.oggetto_nome || 'Foto oggetto';
+        photoViewer.hidden = false;
+        document.body.classList.add('gestione-photo-viewer-open');
     };
 
     const getSelectedRow = () => gestioneState.rows.find((item) => String(item.id) === String(gestioneState.selectedRowId || '')) || null;
@@ -1055,7 +1074,24 @@ async function initGestione() {
 
         populateFilters();
         render();
+        openPhotoViewer(row);
     };
+
+    if (photoViewerCloseBtn) {
+        photoViewerCloseBtn.addEventListener('click', closePhotoViewer);
+    }
+
+    if (photoViewer) {
+        photoViewer.addEventListener('click', (event) => {
+            if (event.target === photoViewer) closePhotoViewer();
+        });
+    }
+
+    document.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape' && photoViewer && !photoViewer.hidden) {
+            closePhotoViewer();
+        }
+    });
 
     btnEditSelected.onclick = () => {
         const row = getSelectedRow();
