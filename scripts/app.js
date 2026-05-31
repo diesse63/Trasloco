@@ -1212,15 +1212,19 @@ const serviziState = {
     scatole: [],
     selectedStanzaId: null,
     scatoleMobiliByScatola: new Map(),
+    scatoleMobileIdsByScatola: new Map(),
     scatolaStanzeByScatola: new Map(),
     oggettiCountByScatola: new Map(),
     stanzaCountByScatola: new Map(),
     filters: {
         scatolaNome: '',
         stanza: '',
+        mobile: '',
+        riaperta: '',
         stampaStatus: '',
         scatolaStato: '',
     },
+    activeScatoleTab: 'all',
     scatolaFotoFile: null,
     scatolaFotoRemoved: false,
 };
@@ -1785,7 +1789,9 @@ async function initServizi(mode = 'stanze') {
     const scatolaMobile = document.getElementById('scatolaMobile');
     const filterScatolaNome = document.getElementById('filterScatolaNome');
     const filterScatolaStanza = document.getElementById('filterScatolaStanza');
+    const filterScatolaMobile = document.getElementById('filterScatolaMobile');
     const filterScatolaStampa = document.getElementById('filterScatolaStampa');
+    const filterScatolaRiaperta = document.getElementById('filterScatolaRiaperta');
     const filterScatolaStato = document.getElementById('filterScatolaStato');
     const scatolaNomeField = document.getElementById('scatolaNomeField');
     const scatolaNomeInput = document.getElementById('scatolaNome');
@@ -2005,11 +2011,25 @@ async function initServizi(mode = 'stanze') {
                     if (!stanzaMap.has(serviziState.filters.stanza)) return false;
                 }
 
+                if (serviziState.filters.mobile) {
+                    const mobileSet = serviziState.scatoleMobileIdsByScatola.get(String(scatola.id)) || new Set();
+                    if (!mobileSet.has(serviziState.filters.mobile)) return false;
+                }
+
+                if (serviziState.filters.riaperta === 'riaperte') {
+                    if (!scatola?.data_riapertura) return false;
+                }
+                if (serviziState.filters.riaperta === 'da-riaprire') {
+                    if (!isScatolaClosed(scatola) || scatola?.data_riapertura) return false;
+                }
+
                 if (serviziState.filters.stampaStatus === 'printed' && !scatola.data) return false;
                 if (serviziState.filters.stampaStatus === 'pending' && scatola.data) return false;
 
                 if (serviziState.filters.scatolaStato === 'closed' && !isScatolaClosed(scatola)) return false;
                 if (serviziState.filters.scatolaStato === 'open' && isScatolaClosed(scatola)) return false;
+
+                if (serviziState.activeScatoleTab === 'da-riaprire' && !isScatolaClosed(scatola)) return false;
                 return true;
             });
 
@@ -2027,6 +2047,7 @@ async function initServizi(mode = 'stanze') {
                     <td>${escapeHtml(formatPrintDate(s.data))}</td>
                     <td class="stato-cell"><span class="stato-dot ${isScatolaClosed(s) ? 'is-closed' : 'is-open'}" aria-hidden="true"></span>${isScatolaClosed(s) ? 'Chiusa' : 'Aperta'}</td>
                     <td>
+                        <button class="mini-btn" data-action="toggle-scatola-stato" data-id="${s.id}">${isScatolaClosed(s) ? 'Riapri' : 'Chiudi'}</button>
                         <button class="mini-btn" data-action="edit-scatola" data-id="${s.id}">Visualizza</button>
                     </td>
                 </tr>
@@ -2077,6 +2098,33 @@ async function initServizi(mode = 'stanze') {
                 filterScatolaStanza.value = '';
                 serviziState.filters.stanza = '';
             }
+        }
+
+        if (filterScatolaMobile) {
+            const oldValue = serviziState.filters.mobile;
+            const mobileOptions = serviziState.mobili
+                .map((mobile) => ({ id: String(mobile.id), name: mobile.nome || String(mobile.id) }))
+                .sort((a, b) => a.name.localeCompare(b.name, 'it'));
+
+            const uniqueMobiles = Array.from(new Map(mobileOptions.map((item) => [item.id, item])).values());
+            filterScatolaMobile.innerHTML = '<option value="">Tutti i mobili</option>' +
+                uniqueMobiles.map((mobile) => `<option value="${escapeHtml(mobile.id)}">${escapeHtml(mobile.name)}</option>`).join('');
+
+            if (oldValue && uniqueMobiles.some((item) => item.id === oldValue)) {
+                filterScatolaMobile.value = oldValue;
+            } else {
+                filterScatolaMobile.value = '';
+                serviziState.filters.mobile = '';
+            }
+        }
+
+        if (filterScatolaRiaperta) {
+            const allowed = new Set(['', 'riaperte', 'da-riaprire']);
+            const oldValue = allowed.has(serviziState.filters.riaperta)
+                ? serviziState.filters.riaperta
+                : '';
+            filterScatolaRiaperta.value = oldValue;
+            serviziState.filters.riaperta = oldValue;
         }
 
         if (filterScatolaStampa) {
@@ -2413,6 +2461,7 @@ async function initServizi(mode = 'stanze') {
             serviziState.selectedStanzaId = null;
         }
         serviziState.scatoleMobiliByScatola = new Map();
+        serviziState.scatoleMobileIdsByScatola = new Map();
         serviziState.scatolaStanzeByScatola = new Map();
         serviziState.oggettiCountByScatola = new Map();
         serviziState.stanzaCountByScatola = new Map();
@@ -2421,6 +2470,7 @@ async function initServizi(mode = 'stanze') {
         const mobileById = new Map(serviziState.mobili.map((mobile) => [String(mobile.id), mobile.nome || String(mobile.id)]));
         const linkedStanzeByScatola = new Map();
         const linkedMobiliByScatola = new Map();
+        const linkedMobiliIdsByScatola = new Map();
 
         (oggettiRes.data || []).forEach((oggetto) => {
             const scatolaKey = String(oggetto.idscatola || '');
@@ -2431,6 +2481,7 @@ async function initServizi(mode = 'stanze') {
 
             if (!linkedStanzeByScatola.has(scatolaKey)) linkedStanzeByScatola.set(scatolaKey, new Set());
             if (!linkedMobiliByScatola.has(scatolaKey)) linkedMobiliByScatola.set(scatolaKey, new Set());
+            if (!linkedMobiliIdsByScatola.has(scatolaKey)) linkedMobiliIdsByScatola.set(scatolaKey, new Set());
             if (!serviziState.stanzaCountByScatola.has(scatolaKey)) serviziState.stanzaCountByScatola.set(scatolaKey, new Map());
 
             if (oggetto.idstanza) {
@@ -2442,6 +2493,7 @@ async function initServizi(mode = 'stanze') {
 
             if (oggetto.idmobile) {
                 linkedMobiliByScatola.get(scatolaKey).add(mobileById.get(String(oggetto.idmobile)) || String(oggetto.idmobile));
+                linkedMobiliIdsByScatola.get(scatolaKey).add(String(oggetto.idmobile));
             }
         });
 
@@ -2453,6 +2505,10 @@ async function initServizi(mode = 'stanze') {
         linkedMobiliByScatola.forEach((values, scatolaKey) => {
             const labels = Array.from(values).filter(Boolean).sort((a, b) => a.localeCompare(b, 'it'));
             serviziState.scatoleMobiliByScatola.set(scatolaKey, labels.length ? labels.join(', ') : '-');
+        });
+
+        linkedMobiliIdsByScatola.forEach((values, scatolaKey) => {
+            serviziState.scatoleMobileIdsByScatola.set(scatolaKey, new Set(values));
         });
 
         if (!scatoleStanzeRes.error) {
@@ -2682,6 +2738,18 @@ async function initServizi(mode = 'stanze') {
             return;
         }
 
+        if (action === 'switch-scatole-tab') {
+            const targetTab = actionElement.dataset.tab || 'all';
+            serviziState.activeScatoleTab = targetTab;
+            document.querySelectorAll('.servizi-tab[data-action="switch-scatole-tab"]').forEach((btn) => {
+                const isActive = btn.dataset.tab === targetTab;
+                btn.classList.toggle('active', isActive);
+                btn.setAttribute('aria-selected', String(isActive));
+            });
+            renderServiziTables();
+            return;
+        }
+
         if (action === 'focus-scatola-foto') {
             document.getElementById('btnScatolaFoto')?.scrollIntoView({ block: 'center', behavior: 'smooth' });
             showServiziMsg('Sezione foto evidenziata nel popup.', 'ok');
@@ -2891,12 +2959,27 @@ async function initServizi(mode = 'stanze') {
         };
     }
 
+    if (filterScatolaRiaperta) {
+        filterScatolaRiaperta.onchange = () => {
+            serviziState.filters.riaperta = filterScatolaRiaperta.value || '';
+            renderServiziTables();
+        };
+    }
+
     if (filterScatolaStato) {
         filterScatolaStato.onchange = () => {
             serviziState.filters.scatolaStato = filterScatolaStato.value || '';
             renderServiziTables();
         };
     }
+
+    if (filterScatolaMobile) {
+        filterScatolaMobile.onchange = () => {
+            serviziState.filters.mobile = filterScatolaMobile.value || '';
+            renderServiziTables();
+        };
+    }
+
     panel?.querySelectorAll('button[data-close-modal]').forEach((btn) => {
         btn.onclick = closeAllModals;
     });
