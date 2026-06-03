@@ -244,39 +244,6 @@
             background: #fffcf5;
         }
 
-        .servizi-tabs {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 10px;
-            margin-bottom: 14px;
-        }
-
-        .servizi-tab {
-            flex: 1 1 180px;
-            text-align: center;
-            border: 1px solid var(--s-line);
-            border-radius: 999px;
-            padding: 10px 14px;
-            cursor: pointer;
-            background: #fff;
-            color: #374151;
-            font-weight: 700;
-        }
-
-        .servizi-tab.active {
-            background: var(--s-accent);
-            color: #fff;
-            border-color: var(--s-accent);
-        }
-
-        .servizi-tab-panel {
-            display: block;
-        }
-
-        .servizi-tab-panel.is-hidden {
-            display: none;
-        }
-
         .scatola-status-hint {
             margin: 0;
             color: #57534e;
@@ -287,15 +254,6 @@
     <div id="serviziMsg" class="servizi-msg"></div>
 
     <article class="servizi-card">
-        <div class="servizi-head">
-            <h3>Scatole</h3>
-            <button id="openScatolaModal" type="button">Nuova Scatola</button>
-        </div>
-        <div class="servizi-tabs" role="tablist" aria-label="Seleziona vista scatole">
-            <button type="button" class="servizi-tab active" id="btnTabScatoleAll" data-action="switch-scatole-tab" data-tab="all" aria-selected="true">Elenco scatole</button>
-            <button type="button" class="servizi-tab" id="btnTabScatoleReopen" data-action="switch-scatole-tab" data-tab="da-riaprire" aria-selected="false">Da riaprire</button>
-        </div>
-        <p>Puoi creare una nuova scatola, filtrare dinamicamente per numero scatola, stanza e mobile, e gestire la riapertura/chiusura direttamente in tabella.</p>
         <section class="scatole-filters" aria-label="Filtri scatole">
             <label>
                 Numero scatola

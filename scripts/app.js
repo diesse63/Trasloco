@@ -1224,7 +1224,6 @@ const serviziState = {
         stampaStatus: '',
         scatolaStato: '',
     },
-    activeScatoleTab: 'all',
     scatolaFotoFile: null,
     scatolaFotoRemoved: false,
 };
@@ -1770,7 +1769,6 @@ async function initServizi(mode = 'stanze') {
     const editSelectedStanza = document.getElementById('editSelectedStanza');
     const deleteSelectedStanza = document.getElementById('deleteSelectedStanza');
     const openMobileModal = document.getElementById('openMobileModal');
-    const openScatolaModal = document.getElementById('openScatolaModal');
     const modalOverlay = document.getElementById('serviziModalOverlay');
     const modalStanze = document.getElementById('modalStanze');
     const modalMobili = document.getElementById('modalMobili');
@@ -2029,7 +2027,6 @@ async function initServizi(mode = 'stanze') {
                 if (serviziState.filters.scatolaStato === 'closed' && !isScatolaClosed(scatola)) return false;
                 if (serviziState.filters.scatolaStato === 'open' && isScatolaClosed(scatola)) return false;
 
-                if (serviziState.activeScatoleTab === 'da-riaprire' && !isScatolaClosed(scatola)) return false;
                 return true;
             });
 
@@ -2738,18 +2735,6 @@ async function initServizi(mode = 'stanze') {
             return;
         }
 
-        if (action === 'switch-scatole-tab') {
-            const targetTab = actionElement.dataset.tab || 'all';
-            serviziState.activeScatoleTab = targetTab;
-            document.querySelectorAll('.servizi-tab[data-action="switch-scatole-tab"]').forEach((btn) => {
-                const isActive = btn.dataset.tab === targetTab;
-                btn.classList.toggle('active', isActive);
-                btn.setAttribute('aria-selected', String(isActive));
-            });
-            renderServiziTables();
-            return;
-        }
-
         if (action === 'focus-scatola-foto') {
             document.getElementById('btnScatolaFoto')?.scrollIntoView({ block: 'center', behavior: 'smooth' });
             showServiziMsg('Sezione foto evidenziata nel popup.', 'ok');
@@ -2906,14 +2891,6 @@ async function initServizi(mode = 'stanze') {
             setServiziView('stanze');
             resetMobileForm();
             openModal('mobili');
-        };
-    }
-    if (openScatolaModal) {
-        openScatolaModal.onclick = () => {
-            setServiziView('scatole');
-            resetScatolaForm();
-            setScatolaModalMode(false);
-            openModal('scatole');
         };
     }
     if (btnViewStanze) btnViewStanze.onclick = () => setServiziView('stanze');

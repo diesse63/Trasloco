@@ -1,4 +1,4 @@
-const CACHE_NAME = 'trasloco-smart-v1';
+const CACHE_NAME = 'trasloco-smart-v2';
 const APP_SHELL = [
     './',
     './index.html',
