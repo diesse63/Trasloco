@@ -1306,7 +1306,13 @@ function getScatolaDisplayName(scatola) {
 }
 
 function isScatolaClosed(scatola) {
-    return scatola?.stato === true || scatola?.stato === 'true' || scatola?.stato === 1;
+    // Considera una scatola "chiusa e non riaperta" quando `stato` è truthy
+    // e non esiste una data di riapertura (`data_riapertura`). Se `data_riapertura`
+    // è presente la scatola è considerata riaperta (quindi non chiusa).
+    if (!scatola) return false;
+    const statoClosed = scatola?.stato === true || scatola?.stato === 'true' || scatola?.stato === 1;
+    const reopened = !!(scatola?.data_riapertura || scatola?.dataRiapertura);
+    return statoClosed && !reopened;
 }
 
 function formatPrintDate(dateValue) {
@@ -2837,12 +2843,15 @@ async function initServizi(mode = 'stanze') {
                 }
             }
 
+            const updatePayload = {
+                stato: nextState,
+                // when closing, store print date; when reopening, clear it
+                ...(nextState ? { data: printedAt, data_riapertura: null } : { data_riapertura: getLocalPgTimestamp(new Date()) , data: scatola.data || null }),
+            };
+
             const updateRes = await supabase
                 .from('scatole')
-                .update({
-                    stato: nextState,
-                    ...(nextState ? { data: printedAt } : {}),
-                })
+                .update(updatePayload)
                 .eq('id', scatola.id);
 
             if (updateRes.error) {
@@ -2852,6 +2861,12 @@ async function initServizi(mode = 'stanze') {
 
             scatola.stato = nextState;
             if (nextState && printedAt) scatola.data = printedAt;
+            // update local knowledge of data_riapertura
+            if (nextState) {
+                scatola.data_riapertura = null;
+            } else {
+                scatola.data_riapertura = getLocalPgTimestamp(new Date());
+            }
             bindScatolaPopupActions(scatola);
             renderServiziTables();
             showServiziMsg(`Scatola ${scatolaRef} aggiornata: ${nextState ? 'Chiusa' : 'Aperta'}.${nextState ? ' PDF archiviato su Drive.' : ''}`, 'ok');
