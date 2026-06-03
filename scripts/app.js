@@ -1220,9 +1220,6 @@ const serviziState = {
         scatolaNome: '',
         stanza: '',
         mobile: '',
-        riaperta: '',
-        stampaStatus: '',
-        scatolaStato: '',
     },
     scatolaFotoFile: null,
     scatolaFotoRemoved: false,
@@ -1788,9 +1785,6 @@ async function initServizi(mode = 'stanze') {
     const filterScatolaNome = document.getElementById('filterScatolaNome');
     const filterScatolaStanza = document.getElementById('filterScatolaStanza');
     const filterScatolaMobile = document.getElementById('filterScatolaMobile');
-    const filterScatolaStampa = document.getElementById('filterScatolaStampa');
-    const filterScatolaRiaperta = document.getElementById('filterScatolaRiaperta');
-    const filterScatolaStato = document.getElementById('filterScatolaStato');
     const scatolaNomeField = document.getElementById('scatolaNomeField');
     const scatolaNomeInput = document.getElementById('scatolaNome');
     const scatolaFotoFile = document.getElementById('scatolaFotoFile');
@@ -2014,19 +2008,6 @@ async function initServizi(mode = 'stanze') {
                     if (!mobileSet.has(serviziState.filters.mobile)) return false;
                 }
 
-                if (serviziState.filters.riaperta === 'riaperte') {
-                    if (!scatola?.data_riapertura) return false;
-                }
-                if (serviziState.filters.riaperta === 'da-riaprire') {
-                    if (!isScatolaClosed(scatola) || scatola?.data_riapertura) return false;
-                }
-
-                if (serviziState.filters.stampaStatus === 'printed' && !scatola.data) return false;
-                if (serviziState.filters.stampaStatus === 'pending' && scatola.data) return false;
-
-                if (serviziState.filters.scatolaStato === 'closed' && !isScatolaClosed(scatola)) return false;
-                if (serviziState.filters.scatolaStato === 'open' && isScatolaClosed(scatola)) return false;
-
                 return true;
             });
 
@@ -2113,15 +2094,6 @@ async function initServizi(mode = 'stanze') {
                 filterScatolaMobile.value = '';
                 serviziState.filters.mobile = '';
             }
-        }
-
-        if (filterScatolaRiaperta) {
-            const allowed = new Set(['', 'riaperte', 'da-riaprire']);
-            const oldValue = allowed.has(serviziState.filters.riaperta)
-                ? serviziState.filters.riaperta
-                : '';
-            filterScatolaRiaperta.value = oldValue;
-            serviziState.filters.riaperta = oldValue;
         }
 
         if (filterScatolaStampa) {
@@ -2925,27 +2897,6 @@ async function initServizi(mode = 'stanze') {
     if (filterScatolaStanza) {
         filterScatolaStanza.onchange = () => {
             serviziState.filters.stanza = filterScatolaStanza.value || '';
-            renderServiziTables();
-        };
-    }
-
-    if (filterScatolaStampa) {
-        filterScatolaStampa.onchange = () => {
-            serviziState.filters.stampaStatus = filterScatolaStampa.value || '';
-            renderServiziTables();
-        };
-    }
-
-    if (filterScatolaRiaperta) {
-        filterScatolaRiaperta.onchange = () => {
-            serviziState.filters.riaperta = filterScatolaRiaperta.value || '';
-            renderServiziTables();
-        };
-    }
-
-    if (filterScatolaStato) {
-        filterScatolaStato.onchange = () => {
-            serviziState.filters.scatolaStato = filterScatolaStato.value || '';
             renderServiziTables();
         };
     }
@@ -3871,4 +3822,4 @@ function initBackupControl() {
     document.addEventListener('keydown', (event) => {
         if (event.key === 'Escape') closeMenu();
     });
-}
+} 
