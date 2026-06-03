@@ -1306,13 +1306,10 @@ function getScatolaDisplayName(scatola) {
 }
 
 function isScatolaClosed(scatola) {
-    // Considera una scatola "chiusa e non riaperta" quando `stato` è truthy
-    // e non esiste una data di riapertura (`data_riapertura`). Se `data_riapertura`
-    // è presente la scatola è considerata riaperta (quindi non chiusa).
+    // Determina lo stato dalla presenza di `data_riapertura`.
+    // Se `data_riapertura` è presente la scatola è considerata aperta, altrimenti chiusa.
     if (!scatola) return false;
-    const statoClosed = scatola?.stato === true || scatola?.stato === 'true' || scatola?.stato === 1;
-    const reopened = !!(scatola?.data_riapertura || scatola?.dataRiapertura);
-    return statoClosed && !reopened;
+    return !Boolean(scatola?.data_riapertura || scatola?.dataRiapertura);
 }
 
 function formatPrintDate(dateValue) {
@@ -2081,10 +2078,9 @@ async function initServizi(mode = 'stanze') {
                     <td>${escapeHtml(getScatolaLinkedStanzeLabel(s.id))}</td>
                     <td>${escapeHtml(getScatolaLinkedMobiliLabel(s.id))}</td>
                     <td>${serviziState.oggettiCountByScatola.get(String(s.id)) || 0}</td>
-                    <td>${escapeHtml(formatPrintDate(s.data))}</td>
-                    <td class="stato-cell"><span class="stato-dot ${isScatolaClosed(s) ? 'is-closed' : 'is-open'}" aria-hidden="true"></span>${isScatolaClosed(s) ? 'Chiusa' : 'Aperta'}</td>
+                    <td class="stato-cell"><span class="stato-dot ${s?.data_riapertura ? 'is-open' : 'is-closed'}" aria-hidden="true"></span>${s?.data_riapertura ? 'Aperta' : 'Non aperta'}</td>
                     <td>
-                        <button class="mini-btn" data-action="toggle-scatola-stato" data-id="${s.id}">${isScatolaClosed(s) ? 'Riapri' : 'Chiudi'}</button>
+                        <button class="mini-btn" data-action="toggle-scatola-apertura" data-id="${s.id}">${s?.data_riapertura ? 'Annulla Apertura' : 'Segna Aperta'}</button>
                         <button class="mini-btn" data-action="edit-scatola" data-id="${s.id}">Visualizza</button>
                     </td>
                 </tr>
@@ -2873,6 +2869,37 @@ async function initServizi(mode = 'stanze') {
             return;
         }
 
+        if (action === 'toggle-scatola-apertura') {
+            const scatola = serviziState.scatole.find(s => String(s.id) === String(id));
+            if (!scatola) {
+                showServiziMsg('Scatola non trovata per aggiornamento apertura.', 'err');
+                return;
+            }
+            const scatolaRef = getScatolaDisplayName(scatola);
+            const currentlyOpen = Boolean(scatola?.data_riapertura);
+            const ok = window.confirm(currentlyOpen
+                ? `Confermi la rimozione della data apertura per la scatola ${scatolaRef}?`
+                : `Confermi l'impostazione della data apertura (ora) per la scatola ${scatolaRef}?`);
+            if (!ok) return;
+
+            const newVal = currentlyOpen ? null : getLocalPgTimestamp(new Date());
+
+            const updateRes = await supabase
+                .from('scatole')
+                .update({ data_riapertura: newVal })
+                .eq('id', scatola.id);
+
+            if (updateRes.error) {
+                showServiziMsg(`Aggiornamento apertura fallito: ${updateRes.error.message}`, 'err');
+                return;
+            }
+
+            scatola.data_riapertura = newVal;
+            bindScatolaPopupActions(scatola);
+            renderServiziTables();
+            showServiziMsg(`Data apertura ${currentlyOpen ? 'rimossa' : 'impostata'} per scatola ${scatolaRef}.`, 'ok');
+            return;
+        }
 
         if (action === 'print-scatola-label') {
             const scatola = serviziState.scatole.find(s => String(s.id) === String(id));
