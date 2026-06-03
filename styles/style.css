@@ -92,8 +92,20 @@ header { background: white; padding: 10px; text-align: center; box-shadow: 0 2px
 	z-index: 100;
 	padding-bottom: env(safe-area-inset-bottom, 0px);
 }
-.bottom-nav button { flex: 1; border: none; background: none; font-size: 14px; font-weight: 600; cursor: pointer; color: #64748b; }
-.bottom-nav button:active { color: var(--primary); }
+.bottom-nav button { flex: 1; border: none; background: none; font-size: 14px; font-weight: 600; cursor: pointer; color: #64748b; transition: color 150ms ease, background 150ms ease; }
+.bottom-nav button:active,
+.bottom-nav button.active,
+.bottom-nav button[aria-current="page"] {
+    color: var(--primary);
+}
+.bottom-nav button.active,
+.bottom-nav button[aria-current="page"] {
+    background: rgba(37, 99, 235, 0.08);
+}
+.bottom-nav button:focus-visible {
+    outline: 2px solid rgba(37, 99, 235, 0.6);
+    outline-offset: 2px;
+}
 
 .panel { padding: 15px; padding-bottom: 80px; }
 .form-group { margin-bottom: 15px; }

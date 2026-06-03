@@ -153,13 +153,39 @@ document.addEventListener('DOMContentLoaded', () => {
     const btnStanze = document.getElementById('nav-stanze');
     const btnScatole = document.getElementById('nav-scatole');
 
-    if (btnIns) btnIns.onclick = () => caricaPannello('inserimento');
-    if (btnGes) btnGes.onclick = () => caricaPannello('gestione');
-    if (btnStanze) btnStanze.onclick = () => caricaPannello('stanze');
-    if (btnScatole) btnScatole.onclick = () => caricaPannello('scatole');
+    const navButtons = [btnIns, btnGes, btnStanze, btnScatole].filter(Boolean);
+    const setActiveNavButton = (selectedBtn) => {
+        navButtons.forEach((btn) => {
+            const isActive = btn === selectedBtn;
+            btn.classList.toggle('active', isActive);
+            if (isActive) {
+                btn.setAttribute('aria-current', 'page');
+            } else {
+                btn.removeAttribute('aria-current');
+            }
+        });
+    };
+
+    if (btnIns) btnIns.onclick = () => {
+        setActiveNavButton(btnIns);
+        caricaPannello('inserimento');
+    };
+    if (btnGes) btnGes.onclick = () => {
+        setActiveNavButton(btnGes);
+        caricaPannello('gestione');
+    };
+    if (btnStanze) btnStanze.onclick = () => {
+        setActiveNavButton(btnStanze);
+        caricaPannello('stanze');
+    };
+    if (btnScatole) btnScatole.onclick = () => {
+        setActiveNavButton(btnScatole);
+        caricaPannello('scatole');
+    };
 
     initNetworkBadge();
     initBackupControl();
+    setActiveNavButton(btnIns);
     caricaPannello('inserimento');
 });
 
