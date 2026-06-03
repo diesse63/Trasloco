@@ -1813,6 +1813,7 @@ async function initServizi(mode = 'stanze') {
     const filterScatolaMobile = document.getElementById('filterScatolaMobile');
     const filterScatolaStampa = document.getElementById('filterScatolaStampa');
     const filterScatolaStato = document.getElementById('filterScatolaStato');
+    const btnResetScatolaFilters = document.getElementById('btnResetScatolaFilters');
     const scatolaNomeField = document.getElementById('scatolaNomeField');
     const scatolaNomeInput = document.getElementById('scatolaNome');
     const scatolaFotoFile = document.getElementById('scatolaFotoFile');
@@ -2071,9 +2072,21 @@ async function initServizi(mode = 'stanze') {
 
         if (filterScatolaNome) {
             const oldValue = serviziState.filters.scatolaNome;
-            const nomi = Array.from(new Set(serviziState.scatole
-                .map((s) => getScatolaDisplayName(s))
-                .filter(Boolean)))
+            // Mostra solo le scatole che contengono la stanza o il mobile selezionati
+            const candidates = serviziState.scatole.filter(s => {
+                const sid = String(s.id);
+                if (serviziState.filters.stanza) {
+                    const smap = serviziState.stanzaCountByScatola.get(sid);
+                    if (!smap || !smap.has(serviziState.filters.stanza)) return false;
+                }
+                if (serviziState.filters.mobile) {
+                    const mset = serviziState.scatoleMobileIdsByScatola.get(sid);
+                    if (!mset || !mset.has(serviziState.filters.mobile)) return false;
+                }
+                return true;
+            });
+
+            const nomi = Array.from(new Set(candidates.map(s => getScatolaDisplayName(s)).filter(Boolean)))
                 .sort((a, b) => a.localeCompare(b, 'it', { numeric: true }));
 
             filterScatolaNome.innerHTML = '<option value="">Numero</option>' +
@@ -2089,11 +2102,20 @@ async function initServizi(mode = 'stanze') {
 
         if (filterScatolaStanza) {
             const oldValue = serviziState.filters.stanza;
-            const stanze = Array.from(new Set(
-                Array.from(serviziState.stanzaCountByScatola.values())
-                    .flatMap((stanzaMap) => Array.from(stanzaMap.keys()))
-                    .filter(Boolean)
-            )).sort((a, b) => a.localeCompare(b, 'it'));
+            const stanzaSet = new Set();
+            // Mostra solo le stanze presenti nella scatola o associate al mobile selezionati
+            serviziState.scatole.forEach(s => {
+                const sid = String(s.id);
+                const matchesNome = !serviziState.filters.scatolaNome || getScatolaDisplayName(s) === serviziState.filters.scatolaNome;
+                const matchesMobile = !serviziState.filters.mobile || (serviziState.scatoleMobileIdsByScatola.get(sid)?.has(serviziState.filters.mobile));
+                
+                if (matchesNome && matchesMobile) {
+                    const smap = serviziState.stanzaCountByScatola.get(sid);
+                    if (smap) smap.forEach((_, name) => stanzaSet.add(name));
+                }
+            });
+
+            const stanze = Array.from(stanzaSet).sort((a, b) => a.localeCompare(b, 'it'));
 
             filterScatolaStanza.innerHTML = '<option value="">Tutte le stanze</option>' +
                 stanze.map((stanza) => `<option value="${escapeHtml(stanza)}">${escapeHtml(stanza)}</option>`).join('');
@@ -2108,15 +2130,30 @@ async function initServizi(mode = 'stanze') {
 
         if (filterScatolaMobile) {
             const oldValue = serviziState.filters.mobile;
-            const mobileOptions = serviziState.mobili
-                .map((mobile) => ({ id: String(mobile.id), name: mobile.nome || String(mobile.id) }))
+            const mobileIdSet = new Set();
+            // Mostra solo i mobili presenti nella scatola o nella stanza selezionate
+            serviziState.scatole.forEach(s => {
+                const sid = String(s.id);
+                const matchesNome = !serviziState.filters.scatolaNome || getScatolaDisplayName(s) === serviziState.filters.scatolaNome;
+                const matchesStanza = !serviziState.filters.stanza || (serviziState.stanzaCountByScatola.get(sid)?.has(serviziState.filters.stanza));
+
+                if (matchesNome && matchesStanza) {
+                    const mset = serviziState.scatoleMobileIdsByScatola.get(sid);
+                    if (mset) mset.forEach(mid => mobileIdSet.add(mid));
+                }
+            });
+
+            const mobileOptions = Array.from(mobileIdSet)
+                .map(mid => {
+                    const m = serviziState.mobili.find(item => String(item.id) === mid);
+                    return { id: mid, name: m ? (m.nome || mid) : mid };
+                })
                 .sort((a, b) => a.name.localeCompare(b.name, 'it'));
-
-            const uniqueMobiles = Array.from(new Map(mobileOptions.map((item) => [item.id, item])).values());
+            
             filterScatolaMobile.innerHTML = '<option value="">Tutti i mobili</option>' +
-                uniqueMobiles.map((mobile) => `<option value="${escapeHtml(mobile.id)}">${escapeHtml(mobile.name)}</option>`).join('');
+                mobileOptions.map((mobile) => `<option value="${escapeHtml(mobile.id)}">${escapeHtml(mobile.name)}</option>`).join('');
 
-            if (oldValue && uniqueMobiles.some((item) => item.id === oldValue)) {
+            if (oldValue && mobileIdSet.has(oldValue)) {
                 filterScatolaMobile.value = oldValue;
             } else {
                 filterScatolaMobile.value = '';
@@ -2918,6 +2955,7 @@ async function initServizi(mode = 'stanze') {
     if (filterScatolaNome) {
         filterScatolaNome.onchange = () => {
             serviziState.filters.scatolaNome = filterScatolaNome.value || '';
+            renderSelects();
             renderServiziTables();
         };
     }
@@ -2925,6 +2963,7 @@ async function initServizi(mode = 'stanze') {
     if (filterScatolaStanza) {
         filterScatolaStanza.onchange = () => {
             serviziState.filters.stanza = filterScatolaStanza.value || '';
+            renderSelects();
             renderServiziTables();
         };
     }
@@ -2932,7 +2971,19 @@ async function initServizi(mode = 'stanze') {
     if (filterScatolaMobile) {
         filterScatolaMobile.onchange = () => {
             serviziState.filters.mobile = filterScatolaMobile.value || '';
+            renderSelects();
             renderServiziTables();
+        };
+    }
+
+    if (btnResetScatolaFilters) {
+        btnResetScatolaFilters.onclick = () => {
+            serviziState.filters.scatolaNome = '';
+            serviziState.filters.stanza = '';
+            serviziState.filters.mobile = '';
+            renderSelects();
+            renderServiziTables();
+            showServiziMsg('Filtri resettati correttamente.', 'ok');
         };
     }
 
