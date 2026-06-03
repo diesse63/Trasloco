@@ -13,7 +13,7 @@ const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABAS
 const supabase = supabaseUrl && supabaseKey ? createClient(supabaseUrl, supabaseKey) : null;
 
 app.use(express.json({ limit: '15mb' }));
-app.use(express.static(__dirname));
+app.use('/', express.static(__dirname));
 
 function ensureDbConfigured(res) {
     if (!supabase) {
