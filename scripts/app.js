@@ -2065,9 +2065,9 @@ async function initServizi(mode = 'stanze') {
             const nomi = Array.from(new Set(serviziState.scatole
                 .map((s) => getScatolaDisplayName(s))
                 .filter(Boolean)))
-                .sort((a, b) => a.localeCompare(b, 'it'));
+                .sort((a, b) => a.localeCompare(b, 'it', { numeric: true }));
 
-            filterScatolaNome.innerHTML = '<option value="">Tutti i nomi</option>' +
+            filterScatolaNome.innerHTML = '<option value="">Numero</option>' +
                 nomi.map((nome) => `<option value="${escapeHtml(nome)}">${escapeHtml(nome)}</option>`).join('');
 
             if (oldValue && nomi.includes(oldValue)) {
