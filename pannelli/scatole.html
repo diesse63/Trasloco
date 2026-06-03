@@ -260,6 +260,24 @@
             border-color: var(--s-accent);
         }
 
+        .scatole-toggle .toggle-badge {
+            display: inline-block;
+            min-width: 20px;
+            padding: 2px 6px;
+            margin-left: 8px;
+            border-radius: 999px;
+            background: rgba(0,0,0,0.06);
+            color: #111827;
+            font-weight: 700;
+            font-size: 12px;
+            text-align: center;
+        }
+
+        .scatole-toggle .toggle-btn.is-active .toggle-badge {
+            background: rgba(255,255,255,0.2);
+            color: white;
+        }
+
         .scatola-status-hint {
             margin: 0;
             color: #57534e;
@@ -291,9 +309,9 @@
             </label>
             <div style="display:flex; gap:8px; align-items:flex-end;">
                 <div id="filterScatolaToggle" class="scatole-toggle" style="display:flex; gap:6px;">
-                    <button type="button" data-state="" class="toggle-btn" title="Tutte le scatole">Tutte</button>
-                    <button type="button" data-state="open" class="toggle-btn" title="Solo aperte">Aperte</button>
-                    <button type="button" data-state="closed" class="toggle-btn" title="Solo non riaperte">Non riaperte</button>
+                    <button type="button" data-state="" class="toggle-btn" title="Tutte le scatole">Tutte <span class="toggle-badge">0</span></button>
+                    <button type="button" data-state="open" class="toggle-btn" title="Solo aperte">Aperte <span class="toggle-badge">0</span></button>
+                    <button type="button" data-state="closed" class="toggle-btn" title="Solo non riaperte">Non riaperte <span class="toggle-badge">0</span></button>
                 </div>
                 <div style="flex:1;">
                     <button id="btnResetScatolaFilters" type="button" class="mini-btn" style="width:100%; height:38px; margin-bottom:0; font-weight:700; border-color:var(--s-accent); color:var(--s-accent);">Svuota Filtri</button>

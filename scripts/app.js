@@ -3032,10 +3032,32 @@ async function initServizi(mode = 'stanze') {
 
     const updateScatolaToggleUi = () => {
         if (!filterScatolaToggle) return;
+        // compute counts based on current select filters (scatolaNome, stanza, mobile)
+        let total = 0, open = 0, closed = 0;
+        serviziState.scatole.forEach((s) => {
+            const sid = String(s.id);
+            if (serviziState.filters.scatolaNome && getScatolaDisplayName(s) !== serviziState.filters.scatolaNome) return;
+            if (serviziState.filters.stanza) {
+                const smap = serviziState.stanzaCountByScatola.get(sid) || new Map();
+                if (!smap.has(serviziState.filters.stanza)) return;
+            }
+            if (serviziState.filters.mobile) {
+                const mset = serviziState.scatoleMobileIdsByScatola.get(sid) || new Set();
+                if (!mset.has(serviziState.filters.mobile)) return;
+            }
+            total += 1;
+            if (isScatolaClosed(s)) closed += 1; else open += 1;
+        });
+
         const buttons = Array.from(filterScatolaToggle.querySelectorAll('button[data-state]'));
         buttons.forEach((btn) => {
             const state = btn.dataset.state || '';
             btn.classList.toggle('is-active', (serviziState.filters.scatolaStato || '') === state);
+            const badge = btn.querySelector('.toggle-badge');
+            if (!badge) return;
+            if (state === '') badge.textContent = String(total);
+            else if (state === 'open') badge.textContent = String(open);
+            else if (state === 'closed') badge.textContent = String(closed);
         });
     };
 
