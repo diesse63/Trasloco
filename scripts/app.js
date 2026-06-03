@@ -1,5 +1,22 @@
 import { supabase } from './supabaseClient.js';
 
+// During local development, unregister any service workers and clear caches
+// to avoid stale PWA assets preventing UI updates.
+if (typeof window !== 'undefined' && (location.hostname === 'localhost' || location.hostname === '127.0.0.1')) {
+    try {
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.getRegistrations().then((regs) => {
+                regs.forEach((r) => r.unregister().catch(() => {}));
+            }).catch(() => {});
+        }
+        if ('caches' in window) {
+            caches.keys().then((keys) => Promise.all(keys.map(k => caches.delete(k)))).catch(() => {});
+        }
+    } catch (e) {
+        // ignore
+    }
+}
+
 const STORAGE_BUCKET_KEY = 'trasloco.storageBucket';
 const PREFERRED_STORAGE_BUCKET = 'Oggetti';
 const STORAGE_BUCKET_FALLBACKS = [PREFERRED_STORAGE_BUCKET, 'oggetti', 'publics', 'public', 'trasloco', 'uploads', 'images', 'immagini'];
@@ -2037,6 +2054,13 @@ async function initServizi(mode = 'stanze') {
                     if (!mobileSet.has(serviziState.filters.mobile)) return false;
                 }
 
+                // Applica filtro per stato scatola se impostato ('' = tutte)
+                if (serviziState.filters.scatolaStato) {
+                    const closed = isScatolaClosed(scatola);
+                    if (serviziState.filters.scatolaStato === 'open' && closed) return false;
+                    if (serviziState.filters.scatolaStato === 'closed' && !closed) return false;
+                }
+
                 return true;
             });
 
@@ -2178,6 +2202,8 @@ async function initServizi(mode = 'stanze') {
             filterScatolaStato.value = oldValue;
             serviziState.filters.scatolaStato = oldValue;
         }
+        // Aggiorna UI toggle stato scatole se presente
+        try { if (typeof updateScatolaToggleUi === 'function') updateScatolaToggleUi(); } catch (e) { /* ignore */ }
     };
 
     const resetStanzaForm = () => {
@@ -2985,6 +3011,30 @@ async function initServizi(mode = 'stanze') {
             renderServiziTables();
             showServiziMsg('Filtri resettati correttamente.', 'ok');
         };
+    }
+
+    const filterScatolaToggle = document.getElementById('filterScatolaToggle');
+
+    const updateScatolaToggleUi = () => {
+        if (!filterScatolaToggle) return;
+        const buttons = Array.from(filterScatolaToggle.querySelectorAll('button[data-state]'));
+        buttons.forEach((btn) => {
+            const state = btn.dataset.state || '';
+            btn.classList.toggle('is-active', (serviziState.filters.scatolaStato || '') === state);
+        });
+    };
+
+    if (filterScatolaToggle) {
+        filterScatolaToggle.addEventListener('click', (ev) => {
+            const btn = ev.target.closest('button[data-state]');
+            if (!btn) return;
+            const newState = btn.dataset.state || '';
+            serviziState.filters.scatolaStato = newState;
+            updateScatolaToggleUi();
+            renderSelects();
+            renderServiziTables();
+            showServiziMsg(`Filtro stato scatole: ${newState === '' ? 'Tutte' : (newState === 'open' ? 'Aperte' : 'Non riaperte')}`, 'ok');
+        });
     }
 
     panel?.querySelectorAll('button[data-close-modal]').forEach((btn) => {
