@@ -2107,7 +2107,14 @@ async function initServizi(mode = 'stanze') {
                     <td class="stato-cell"><span class="stato-dot ${s?.data_riapertura ? 'is-open' : 'is-closed'}" aria-hidden="true"></span>${s?.data_riapertura ? 'Aperta' : 'Non aperta'}</td>
                     <td class="azioni-cell">
                         <div class="btn-group">
-                            <button class="mini-btn ${s?.data_riapertura ? 'btn-toggle-aperta' : 'btn-toggle-chiusa'}" data-action="toggle-scatola-apertura" data-id="${s.id}">${s?.data_riapertura ? 'Annulla' : 'Segna Aperta'}</button>
+                            <button class="mini-btn ${s?.data_riapertura ? 'btn-toggle-aperta' : 'btn-toggle-chiusa'}" data-action="toggle-scatola-apertura" data-id="${s.id}">
+                                <span class="status-icon">
+                                    ${s?.data_riapertura 
+                                        ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 9-2.5"></path></svg>'
+                                        : '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 4"></path></svg>'}
+                                </span>
+                                ${s?.data_riapertura ? 'Annulla' : 'Segna Aperta'}
+                            </button>
                             <button class="mini-btn" data-action="edit-scatola" data-id="${s.id}">Visualizza</button>
                         </div>
                     </td>
