@@ -1263,6 +1263,7 @@ const serviziState = {
         scatolaNome: '',
         stanza: '',
         mobile: '',
+        scatolaStato: '',
     },
     scatolaFotoFile: null,
     scatolaFotoRemoved: false,
@@ -1306,10 +1307,10 @@ function getScatolaDisplayName(scatola) {
 }
 
 function isScatolaClosed(scatola) {
-    // Determina lo stato dalla presenza di `data_riapertura`.
-    // Se `data_riapertura` è presente la scatola è considerata aperta, altrimenti chiusa.
+    // La scatola è APERTA se data_riapertura ha un valore (timestamp).
+    // È CHIUSA se data_riapertura è null o undefined.
     if (!scatola) return false;
-    return !Boolean(scatola?.data_riapertura || scatola?.dataRiapertura);
+    return !Boolean(scatola.data_riapertura);
 }
 
 function formatPrintDate(dateValue) {
@@ -2069,6 +2070,7 @@ async function initServizi(mode = 'stanze') {
 
             if (filteredScatole.length === 0) {
                 tbScatole.innerHTML = '<tr><td colspan="7">Nessuna scatola trovata con i filtri selezionati.</td></tr>';
+                try { if (typeof updateScatolaToggleUi === 'function') updateScatolaToggleUi(); } catch (e) { /* ignore */ }
                 return;
             }
 
@@ -2086,6 +2088,7 @@ async function initServizi(mode = 'stanze') {
                 </tr>
             `).join('');
         }
+        updateScatolaToggleUi();
     };
 
     const renderSelects = () => {
@@ -2204,8 +2207,7 @@ async function initServizi(mode = 'stanze') {
             filterScatolaStato.value = oldValue;
             serviziState.filters.scatolaStato = oldValue;
         }
-        // Aggiorna UI toggle stato scatole se presente
-        try { if (typeof updateScatolaToggleUi === 'function') updateScatolaToggleUi(); } catch (e) { /* ignore */ }
+        updateScatolaToggleUi();
     };
 
     const resetStanzaForm = () => {
@@ -2857,12 +2859,11 @@ async function initServizi(mode = 'stanze') {
 
             scatola.stato = nextState;
             if (nextState && printedAt) scatola.data = printedAt;
-            // update local knowledge of data_riapertura
-            if (nextState) {
-                scatola.data_riapertura = null;
-            } else {
-                scatola.data_riapertura = getLocalPgTimestamp(new Date());
-            }
+            
+            // Sincronizzazione proprietà locale
+            scatola.data_riapertura = nextState ? null : getLocalPgTimestamp(new Date());
+            if (scatola.dataRiapertura) delete scatola.dataRiapertura;
+
             bindScatolaPopupActions(scatola);
             renderServiziTables();
             showServiziMsg(`Scatola ${scatolaRef} aggiornata: ${nextState ? 'Chiusa' : 'Aperta'}.${nextState ? ' PDF archiviato su Drive.' : ''}`, 'ok');
@@ -2895,6 +2896,8 @@ async function initServizi(mode = 'stanze') {
             }
 
             scatola.data_riapertura = newVal;
+            if (scatola.dataRiapertura) delete scatola.dataRiapertura;
+
             bindScatolaPopupActions(scatola);
             renderServiziTables();
             showServiziMsg(`Data apertura ${currentlyOpen ? 'rimossa' : 'impostata'} per scatola ${scatolaRef}.`, 'ok');
