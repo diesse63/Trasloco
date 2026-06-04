@@ -3154,25 +3154,21 @@ async function initServizi(mode = 'stanze') {
     }
 
     if (grigliaOggettiScatole) {
-        grigliaOggettiScatole.onclick = (event) => {
-            const card = event.target.closest('[data-row-id]');
-            if (!card) return;
-            const o = (serviziState.oggetti || []).find(item => String(item.id) === String(card.dataset.rowId));
-            if (o && photoViewer && photoViewerImg) {
-                photoViewerImg.src = getPublicStorageUrl(o.pathfoto);
-                photoViewerImg.alt = o.nome || 'Foto oggetto';
-                photoViewer.hidden = false;
-                document.body.classList.add('gestione-photo-viewer-open');
-            }
-        };
-
         grigliaOggettiScatole.ondblclick = (event) => {
             const card = event.target.closest('[data-row-id]');
             if (!card) return;
             const o = (serviziState.oggetti || []).find(item => String(item.id) === String(card.dataset.rowId));
             if (!o) return;
 
-            // Attivazione filtro scatola sulla scatola collegata
+            // 1. Visualizzazione foto a schermo intero
+            if (o && photoViewer && photoViewerImg) {
+                photoViewerImg.src = getPublicStorageUrl(o.pathfoto);
+                photoViewerImg.alt = o.nome || 'Foto oggetto';
+                photoViewer.hidden = false;
+                document.body.classList.add('gestione-photo-viewer-open');
+            }
+
+            // 2. Attivazione filtro sulla scatola collegata
             const scatola = serviziState.scatole.find(s => String(s.id) === String(o.idscatola));
             if (scatola) {
                 const boxName = getScatolaDisplayName(scatola);
