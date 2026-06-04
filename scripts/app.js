@@ -2107,7 +2107,7 @@ async function initServizi(mode = 'stanze') {
                     <td class="stato-cell"><span class="stato-dot ${s?.data_riapertura ? 'is-open' : 'is-closed'}" aria-hidden="true"></span>${s?.data_riapertura ? 'Aperta' : 'Non aperta'}</td>
                     <td class="azioni-cell">
                         <div class="btn-group">
-                            <button class="mini-btn" data-action="toggle-scatola-apertura" data-id="${s.id}">${s?.data_riapertura ? 'Annulla' : 'Segna Aperta'}</button>
+                            <button class="mini-btn ${s?.data_riapertura ? 'btn-toggle-aperta' : 'btn-toggle-chiusa'}" data-action="toggle-scatola-apertura" data-id="${s.id}">${s?.data_riapertura ? 'Annulla' : 'Segna Aperta'}</button>
                             <button class="mini-btn" data-action="edit-scatola" data-id="${s.id}">Visualizza</button>
                         </div>
                     </td>
