@@ -106,6 +106,33 @@
             position: sticky;
             top: 0;
             background: #fafaf9;
+            z-index: 10;
+            box-shadow: 0 1px 0 var(--s-line);
+        }
+
+        .azioni-cell {
+            padding: 0 !important;
+            vertical-align: stretch;
+        }
+
+        .azioni-cell .btn-group {
+            display: flex;
+            height: 100%;
+            min-height: 48px;
+        }
+
+        .azioni-cell .mini-btn {
+            flex: 1;
+            margin: 0;
+            border: none;
+            border-radius: 0;
+            border-left: 1px solid var(--s-line);
+            height: 100%;
+            font-size: 13px;
+        }
+
+        .azioni-cell .mini-btn:first-child {
+            border-left: none;
         }
 
         .mini-btn {

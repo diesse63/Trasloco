@@ -968,7 +968,7 @@ async function initGestione() {
             const selectedClass = String(gestioneState.selectedRowId || '') === String(o.id) ? 'is-selected' : '';
             return `
                 <button type="button" class="item-card ${selectedClass}" data-row-id="${o.id}" title="Scatola ${escapeHtml(o.scatola_nome)} - ${escapeHtml(o.stanza_nome)} - ${escapeHtml(o.mobile_nome || 'Senza mobile')}">
-                    <img src="${escapeHtml(getPublicStorageUrl(o.oggetto_foto))}" alt="${escapeHtml(o.oggetto_nome || 'Oggetto')}">
+                    <img src="${escapeHtml(getPublicStorageUrl(o.oggetto_foto))}" alt="${escapeHtml(o.oggetto_nome || 'Oggetto')}" loading="lazy">
                 </button>
             `;
         }).join('');
@@ -1920,7 +1920,7 @@ async function initServizi(mode = 'stanze') {
 
         grigliaOggettiScatole.innerHTML = data.map((o) => `
             <button type="button" class="item-card" data-row-id="${o.id}" title="${escapeHtml(o.nome || 'Oggetto')}">
-                <img src="${escapeHtml(getPublicStorageUrl(o.pathfoto))}" alt="${escapeHtml(o.nome || 'Oggetto')}">
+                <img src="${escapeHtml(getPublicStorageUrl(o.pathfoto))}" alt="${escapeHtml(o.nome || 'Oggetto')}" loading="lazy">
             </button>
         `).join('');
     };
@@ -2105,9 +2105,11 @@ async function initServizi(mode = 'stanze') {
                     <td>${escapeHtml(getScatolaLinkedMobiliLabel(s.id))}</td>
                     <td>${serviziState.oggettiCountByScatola.get(String(s.id)) || 0}</td>
                     <td class="stato-cell"><span class="stato-dot ${s?.data_riapertura ? 'is-open' : 'is-closed'}" aria-hidden="true"></span>${s?.data_riapertura ? 'Aperta' : 'Non aperta'}</td>
-                    <td>
-                        <button class="mini-btn" data-action="toggle-scatola-apertura" data-id="${s.id}">${s?.data_riapertura ? 'Annulla Apertura' : 'Segna Aperta'}</button>
-                        <button class="mini-btn" data-action="edit-scatola" data-id="${s.id}">Visualizza</button>
+                    <td class="azioni-cell">
+                        <div class="btn-group">
+                            <button class="mini-btn" data-action="toggle-scatola-apertura" data-id="${s.id}">${s?.data_riapertura ? 'Annulla' : 'Segna Aperta'}</button>
+                            <button class="mini-btn" data-action="edit-scatola" data-id="${s.id}">Visualizza</button>
+                        </div>
                     </td>
                 </tr>
             `).join('');
@@ -3131,6 +3133,26 @@ async function initServizi(mode = 'stanze') {
         });
     }
 
+    const tbScatoleBody = document.getElementById('tbScatole');
+    if (tbScatoleBody) {
+        tbScatoleBody.ondblclick = (event) => {
+            const row = event.target.closest('tr[data-scatola-id]');
+            if (!row) return;
+
+            const sid = row.dataset.scatolaId;
+            const scatola = serviziState.scatole.find(s => String(s.id) === String(sid));
+            if (scatola) {
+                const boxName = getScatolaDisplayName(scatola);
+                serviziState.filters.scatolaNome = boxName;
+                if (filterScatolaNome) filterScatolaNome.value = boxName;
+
+                renderSelects();
+                renderServiziTables();
+                showServiziMsg(`Filtro applicato: Scatola ${boxName}`, 'ok');
+            }
+        };
+    }
+
     if (grigliaOggettiScatole) {
         grigliaOggettiScatole.onclick = (event) => {
             const card = event.target.closest('[data-row-id]');
@@ -3141,6 +3163,25 @@ async function initServizi(mode = 'stanze') {
                 photoViewerImg.alt = o.nome || 'Foto oggetto';
                 photoViewer.hidden = false;
                 document.body.classList.add('gestione-photo-viewer-open');
+            }
+        };
+
+        grigliaOggettiScatole.ondblclick = (event) => {
+            const card = event.target.closest('[data-row-id]');
+            if (!card) return;
+            const o = (serviziState.oggetti || []).find(item => String(item.id) === String(card.dataset.rowId));
+            if (!o) return;
+
+            // Attivazione filtro scatola sulla scatola collegata
+            const scatola = serviziState.scatole.find(s => String(s.id) === String(o.idscatola));
+            if (scatola) {
+                const boxName = getScatolaDisplayName(scatola);
+                serviziState.filters.scatolaNome = boxName;
+                if (filterScatolaNome) filterScatolaNome.value = boxName;
+
+                renderSelects();
+                renderServiziTables();
+                showServiziMsg(`Filtro applicato: Scatola ${boxName}`, 'ok');
             }
         };
     }
