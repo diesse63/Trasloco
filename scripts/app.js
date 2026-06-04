@@ -1911,10 +1911,10 @@ async function initServizi(mode = 'stanze') {
         if (!grigliaOggettiScatole) return;
 
         const filteredBoxIds = new Set(filteredScatole.map(s => String(s.id)));
-        const data = (serviziState.oggetti || []).filter(o => filteredBoxIds.has(String(o.idscatola)));
+        const data = (serviziState.oggetti || []).filter(o => o.idscatola && filteredBoxIds.has(String(o.idscatola)));
 
         if (data.length === 0) {
-            grigliaOggettiScatole.innerHTML = '<p style="grid-column:1/-1; margin:0; color:#64748b;">Nessun oggetto trovato nelle scatole selezionate.</p>';
+            grigliaOggettiScatole.innerHTML = '<p style="grid-column:1/-1; margin:0; padding:20px; color:#64748b; text-align:center; border:1px dashed var(--s-line); border-radius:8px;">Nessuna foto disponibile per le scatole selezionate.</p>';
             return;
         }
 
@@ -2093,7 +2093,7 @@ async function initServizi(mode = 'stanze') {
 
             if (filteredScatole.length === 0) {
                 tbScatole.innerHTML = '<tr><td colspan="7">Nessuna scatola trovata con i filtri selezionati.</td></tr>';
-                if (isScatoleMode) renderOggettiGallery([]);
+                renderOggettiGallery([]);
                 try { if (typeof updateScatolaToggleUi === 'function') updateScatolaToggleUi(); } catch (e) { /* ignore */ }
                 return;
             }
@@ -2112,7 +2112,7 @@ async function initServizi(mode = 'stanze') {
                 </tr>
             `).join('');
 
-            if (isScatoleMode) renderOggettiGallery(filteredScatole);
+            renderOggettiGallery(filteredScatole);
         }
         updateScatolaToggleUi();
     };
