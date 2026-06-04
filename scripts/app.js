@@ -202,8 +202,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     initNetworkBadge();
     initBackupControl();
-    setActiveNavButton(btnIns);
-    caricaPannello('inserimento');
+    setActiveNavButton(btnScatole);
+    caricaPannello('scatole');
 });
 
 function initNetworkBadge() {
@@ -1253,6 +1253,7 @@ const serviziState = {
     stanze: [],
     mobili: [],
     scatole: [],
+    oggetti: [],
     selectedStanzaId: null,
     scatoleMobiliByScatola: new Map(),
     scatoleMobileIdsByScatola: new Map(),
@@ -1848,6 +1849,10 @@ async function initServizi(mode = 'stanze') {
     const btnScatolaCmdDelete = document.getElementById('btnScatolaCmdDelete');
     const modalTitleScatole = document.getElementById('modalTitleScatole');
     const submitScatola = document.getElementById('submitScatola');
+    const grigliaOggettiScatole = document.getElementById('grigliaOggettiScatole');
+    const photoViewer = document.getElementById('gestionePhotoViewer');
+    const photoViewerImg = document.getElementById('gestionePhotoViewerImg');
+    const photoViewerCloseBtn = document.getElementById('gestionePhotoViewerClose');
 
     if (isStanzeMode && (!formStanze || !formMobili)) return;
     if (isScatoleMode && !formScatole) return;
@@ -1900,6 +1905,24 @@ async function initServizi(mode = 'stanze') {
         modalOverlay.classList.remove('is-hidden');
         modalOverlay.setAttribute('aria-hidden', 'false');
         target.classList.remove('is-hidden');
+    };
+
+    const renderOggettiGallery = (filteredScatole) => {
+        if (!grigliaOggettiScatole) return;
+
+        const filteredBoxIds = new Set(filteredScatole.map(s => String(s.id)));
+        const data = (serviziState.oggetti || []).filter(o => filteredBoxIds.has(String(o.idscatola)));
+
+        if (data.length === 0) {
+            grigliaOggettiScatole.innerHTML = '<p style="grid-column:1/-1; margin:0; color:#64748b;">Nessun oggetto trovato nelle scatole selezionate.</p>';
+            return;
+        }
+
+        grigliaOggettiScatole.innerHTML = data.map((o) => `
+            <button type="button" class="item-card" data-row-id="${o.id}" title="${escapeHtml(o.nome || 'Oggetto')}">
+                <img src="${escapeHtml(getPublicStorageUrl(o.pathfoto))}" alt="${escapeHtml(o.nome || 'Oggetto')}">
+            </button>
+        `).join('');
     };
 
     const renderStanzaFocusPanel = () => {
@@ -2070,6 +2093,7 @@ async function initServizi(mode = 'stanze') {
 
             if (filteredScatole.length === 0) {
                 tbScatole.innerHTML = '<tr><td colspan="7">Nessuna scatola trovata con i filtri selezionati.</td></tr>';
+                if (isScatoleMode) renderOggettiGallery([]);
                 try { if (typeof updateScatolaToggleUi === 'function') updateScatolaToggleUi(); } catch (e) { /* ignore */ }
                 return;
             }
@@ -2087,6 +2111,8 @@ async function initServizi(mode = 'stanze') {
                     </td>
                 </tr>
             `).join('');
+
+            if (isScatoleMode) renderOggettiGallery(filteredScatole);
         }
         updateScatolaToggleUi();
     };
@@ -2511,13 +2537,14 @@ async function initServizi(mode = 'stanze') {
             supabase.from('mobili').select('*').order('nome', { ascending: true }),
             supabase.from('scatole').select('*').order('id', { ascending: true }),
             supabase.from('vista_scatole_stanze').select('scatola_id,stanze_presenti'),
-            supabase.from('oggetti').select('idscatola,idstanza,idmobile'),
+            supabase.from('oggetti').select('*'),
         ]);
 
         if (stanzeRes.error || mobiliRes.error || scatoleRes.error || oggettiRes.error) {
             throw new Error(stanzeRes.error?.message || mobiliRes.error?.message || scatoleRes.error?.message || oggettiRes.error?.message || 'Errore caricamento dati');
         }
 
+        serviziState.oggetti = oggettiRes.data || [];
         serviziState.stanze = stanzeRes.data || [];
         serviziState.mobili = mobiliRes.data || [];
         serviziState.scatole = scatoleRes.data || [];
@@ -3102,6 +3129,34 @@ async function initServizi(mode = 'stanze') {
             renderServiziTables();
             showServiziMsg(`Filtro stato scatole: ${newState === '' ? 'Tutte' : (newState === 'open' ? 'Aperte' : 'Non riaperte')}`, 'ok');
         });
+    }
+
+    if (grigliaOggettiScatole) {
+        grigliaOggettiScatole.onclick = (event) => {
+            const card = event.target.closest('[data-row-id]');
+            if (!card) return;
+            const o = (serviziState.oggetti || []).find(item => String(item.id) === String(card.dataset.rowId));
+            if (o && photoViewer && photoViewerImg) {
+                photoViewerImg.src = getPublicStorageUrl(o.pathfoto);
+                photoViewerImg.alt = o.nome || 'Foto oggetto';
+                photoViewer.hidden = false;
+                document.body.classList.add('gestione-photo-viewer-open');
+            }
+        };
+    }
+
+    const closePhotoViewer = () => {
+        if (!photoViewer || !photoViewerImg) return;
+        photoViewer.hidden = true;
+        photoViewerImg.src = '';
+        document.body.classList.remove('gestione-photo-viewer-open');
+    };
+
+    if (photoViewerCloseBtn) photoViewerCloseBtn.onclick = closePhotoViewer;
+    if (photoViewer) {
+        photoViewer.onclick = (e) => {
+            if (e.target === photoViewer) closePhotoViewer();
+        };
     }
 
     panel?.querySelectorAll('button[data-close-modal]').forEach((btn) => {
