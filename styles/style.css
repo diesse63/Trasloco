@@ -395,6 +395,26 @@ body.gestione-photo-viewer-open {
 	}
 }
 
+/* Allineamento colonne e stili tabella scatole */
+.numero-cell, .azioni-cell, .stato-cell {
+	text-align: center;
+	vertical-align: middle;
+}
+
+.stato-dot {
+	display: inline-block;
+	width: 10px;
+	height: 10px;
+	border-radius: 50%;
+	margin-right: 8px;
+}
+.stato-dot.is-open {
+	background-color: #10b981;
+}
+.stato-dot.is-closed {
+	background-color: #94a3b8;
+}
+
 .panel-inserimento h2 { font-size: 1.7rem; margin-bottom: 8px; }
 .wizard-subtitle { margin: 0 0 14px; color: #334155; font-size: 1.05rem; }
 
