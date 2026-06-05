@@ -2116,10 +2116,10 @@ async function initServizi(mode = 'stanze') {
                             </button>
                         </div>
                     </td>
-                    <td>${escapeHtml(getScatolaDisplayName(s))}</td>
+                    <td class="numero-cell">${escapeHtml(getScatolaDisplayName(s))}</td>
                     <td>${escapeHtml(getScatolaLinkedStanzeLabel(s.id))}</td>
                     <td>${escapeHtml(getScatolaLinkedMobiliLabel(s.id))}</td>
-                    <td>${serviziState.oggettiCountByScatola.get(String(s.id)) || 0}</td>
+                    <td class="numero-cell">${serviziState.oggettiCountByScatola.get(String(s.id)) || 0}</td>
                     <td class="stato-cell"><span class="stato-dot ${s?.data_riapertura ? 'is-open' : 'is-closed'}" aria-hidden="true"></span>${s?.data_riapertura ? 'Aperta' : 'Non aperta'}</td>
                 </tr>
             `).join('');
