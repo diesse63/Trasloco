@@ -2100,11 +2100,6 @@ async function initServizi(mode = 'stanze') {
 
             tbScatole.innerHTML = filteredScatole.map(s => `
                 <tr data-scatola-id="${s.id}">
-                    <td>${escapeHtml(getScatolaDisplayName(s))}</td>
-                    <td>${escapeHtml(getScatolaLinkedStanzeLabel(s.id))}</td>
-                    <td>${escapeHtml(getScatolaLinkedMobiliLabel(s.id))}</td>
-                    <td>${serviziState.oggettiCountByScatola.get(String(s.id)) || 0}</td>
-                    <td class="stato-cell"><span class="stato-dot ${s?.data_riapertura ? 'is-open' : 'is-closed'}" aria-hidden="true"></span>${s?.data_riapertura ? 'Aperta' : 'Non aperta'}</td>
                     <td class="azioni-cell">
                         <div class="btn-group">
                             <button class="mini-btn ${s?.data_riapertura ? 'btn-toggle-aperta' : 'btn-toggle-chiusa'}" data-action="toggle-scatola-apertura" data-id="${s.id}" title="${s?.data_riapertura ? 'Annulla' : 'Segna Aperta'}">
@@ -2114,9 +2109,10 @@ async function initServizi(mode = 'stanze') {
                                         : '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 4"></path></svg>'}
                                 </span>
                             </button>
-                            <button class="mini-btn" data-action="edit-scatola" data-id="${s.id}">Visualizza</button>
                             <button class="mini-btn" data-action="edit-scatola" data-id="${s.id}" title="Visualizza">
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:18px; height:18px; vertical-align: middle;"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                                <span class="status-icon" style="color: var(--s-accent);">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                                </span>
                             </button>
                         </div>
                     </td>
